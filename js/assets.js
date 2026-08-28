@@ -16,7 +16,10 @@ const ASSET_LIST = [
   'boss_heishan', 'boss_heishan_rage',             // Boss 两形态
   'pickup_sword2', 'pickup_rage', 'pickup_shield', // 掉落道具五枚
   'pickup_nova', 'pickup_vacuum',
-  'bg_ch1_sky', 'bg_ch1_far', 'bg_ch1_near',       // 第一章地图三视差层
+  'fx_slash', 'fx_nova', 'fx_tornado', 'fx_tierup', 'fx_splat', // 技能特效（待接入演出）
+  'tile_ch1',                                       // 俯视无缝地砖（Survivor 化用）
+  'deco_lantern', 'deco_incense', 'deco_bamboo',    // 地图装饰件（待撒点渲染）
+  'deco_stele', 'deco_jar',
 ];
 
 const Assets = {
