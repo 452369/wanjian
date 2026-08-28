@@ -234,6 +234,13 @@ class Monster {
     this.shootCd = rand(0.6, c.shootGap || 1);
     this.sine = rand(0, TAU);
     this.strafe = Math.random() < 0.5 ? 1 : -1;
+    // 动画与攻击状态
+    this.lungeCd = rand(1.2, 2.2); // 狼妖扑击冷却
+    this.lungeT = 0; this.lvx = 0; this.lvy = 0;
+    this.windup = 0;               // 蓄力预警（狼扑/妖将震地）
+    this.slamCd = rand(2.5, 3.5);  // 妖将震地冷却
+    this.slamT = 0;
+    this.tell = false;             // 符鬼施法预警
     this.boss = type === 'boss';
     this.elite = type === 'elite';
     if (this.boss) {
@@ -256,10 +263,49 @@ class Monster {
     const dist = Math.hypot(dx, dy) || 1;
     const nx = dx / dist, ny = dy / dist;
     switch (this.type) {
-      case 'wolf':
-      case 'elite': { // 直线追击
+      case 'wolf': { // 追击 + 周期扑击（蓄力→突进，攻击动画）
+        this.lungeCd -= dt;
+        if (this.lungeT > 0) {
+          this.lungeT -= dt;
+          this.x += this.lvx * dt; this.y += this.lvy * dt;
+        } else if (this.windup > 0) {
+          this.windup -= dt;
+          if (this.windup <= 0) {
+            this.lungeT = 0.22;
+            const sp = this.speed * 2.6;
+            this.lvx = nx * sp; this.lvy = ny * sp;
+            AudioSys.eshoot();
+          }
+        } else {
+          this.x += nx * this.speed * dt;
+          this.y += ny * this.speed * dt;
+          if (this.lungeCd <= 0 && dist < 190) { this.windup = 0.22; this.lungeCd = rand(1.6, 2.4); }
+        }
+        break;
+      }
+      case 'elite': { // 追击 + 震地拍击（蓄力圈预警→范围伤害）
+        this.slamCd -= dt;
+        if (this.slamT > 0) {
+          this.slamT -= dt;
+          if (this.slamT <= 0) {
+            FX.ring(this.x, this.y, '#ff4a6a', 22, 320);
+            Cam.shake(5);
+            if (dist < 120) p.hurt(18, game);
+            AudioSys.boom();
+          }
+          break;
+        }
+        if (this.windup > 0) {
+          this.windup -= dt;
+          if (this.windup <= 0) this.slamT = 0.18;
+          break;
+        }
         this.x += nx * this.speed * dt;
         this.y += ny * this.speed * dt;
+        if (this.slamCd <= 0 && dist < 170) {
+          this.windup = 0.45; this.slamCd = 3.2;
+          FX.text(this.x, this.y - this.r - 14, '震地！', '#ff4a6a', 14);
+        }
         break;
       }
       case 'bat': { // 追击 + 垂直正弦摆动
@@ -268,7 +314,7 @@ class Monster {
         this.y += (ny * this.speed + nx * sway) * dt;
         break;
       }
-      case 'ghost': { // 保持距离放风筝 + 吐符
+      case 'ghost': { // 保持距离放风筝 + 吐符（出手前红光预警）
         if (dist > this.cfg.keepDist) {
           this.x += nx * this.speed * dt;
           this.y += ny * this.speed * dt;
@@ -278,8 +324,10 @@ class Monster {
           if (Math.random() < dt * 0.4) this.strafe *= -1;
         }
         this.shootCd -= dt;
+        this.tell = this.shootCd > 0 && this.shootCd < 0.35;
         if (this.shootCd <= 0 && dist < 560) {
           this.shootCd = this.cfg.shootGap;
+          this.tell = false;
           const a = Math.atan2(dy, dx);
           game.spawnBullet(this.x, this.y, a, this.cfg.bulletSpeed, this.cfg.bulletDmg);
           AudioSys.eshoot();
@@ -392,10 +440,18 @@ class Monster {
   drawWolf(ctx, game, fl) {
     const a = Math.atan2(game.player.y - this.y, game.player.x - this.x);
     const r = this.r;
-    if (drawSprite(ctx, 'monster_wolf', this.x, this.y, { size: r * 2.7, angle: a - Math.PI / 2 })) return;
+    // 行走起伏 + 扑击拉伸 + 蓄力脉冲
+    const moving = this.lungeT <= 0 && this.windup <= 0;
+    const hop = moving ? Math.abs(Math.sin(this.t * 10)) * 3 : 0;
+    const lk = this.lungeT > 0 ? this.lungeT / 0.22 : 0;
+    const wind = this.windup > 0 ? 1 + 0.12 * Math.sin(this.windup * 45) : 1;
+    if (drawSprite(ctx, 'monster_wolf', this.x, this.y - hop, {
+      size: r * 2.7 * wind, angle: a - Math.PI / 2, sx: 1 + lk * 0.35, sy: 1 - lk * 0.18,
+    })) return;
     ctx.save();
-    ctx.translate(this.x, this.y);
+    ctx.translate(this.x, this.y - hop);
     ctx.rotate(a);
+    ctx.scale(1 + lk * 0.35, 1 - lk * 0.18);
     const body = fl ? '#ffffff' : '#5a5470';
     const dark = fl ? '#ffffff' : '#423c58';
     ctx.strokeStyle = dark; ctx.lineWidth = 4;
@@ -421,7 +477,8 @@ class Monster {
   }
 
   drawBat(ctx, fl) {
-    if (drawSprite(ctx, 'monster_bat', this.x, this.y, { size: this.r * 2.6 })) return;
+    // 扇翅挤压动画
+    if (drawSprite(ctx, 'monster_bat', this.x, this.y, { size: this.r * 2.6, sy: 1 + Math.sin(this.t * 13) * 0.1 })) return;
     const r = this.r;
     const w = Math.sin(this.t * 13) * 0.6;
     ctx.save();
@@ -444,9 +501,16 @@ class Monster {
   }
 
   drawGhost(ctx, fl) {
-    if (drawSprite(ctx, 'monster_ghost', this.x, this.y, { size: this.r * 2.6, angle: Math.sin(this.t * 2.2) * 0.14 })) return;
+    // 施法红光预警 + 漂浮起伏
+    if (this.tell && !fl) {
+      ctx.globalAlpha = 0.5;
+      ctx.drawImage(glowSprite('#ff4040'), this.x - 24, this.y - 24, 48, 48);
+      ctx.globalAlpha = 1;
+    }
+    const bob = Math.sin(this.t * 2) * 3;
+    if (drawSprite(ctx, 'monster_ghost', this.x, this.y + bob, { size: this.r * 2.6, angle: Math.sin(this.t * 2.2) * 0.14 })) return;
     ctx.save();
-    ctx.translate(this.x, this.y);
+    ctx.translate(this.x, this.y + bob);
     ctx.rotate(Math.sin(this.t * 2.2) * 0.14);
     ctx.globalAlpha = 0.4;
     ctx.drawImage(glowSprite('#ffcf5a'), -20, -20, 40, 40);
@@ -472,7 +536,18 @@ class Monster {
   drawElite(ctx, game, fl) {
     const a = Math.atan2(game.player.y - this.y, game.player.x - this.x);
     const r = this.r;
-    if (drawSprite(ctx, 'monster_elite', this.x, this.y, { size: r * 2.5, angle: a - Math.PI / 2 })) {
+    // 震地预警圈（蓄力进度可视化）
+    if (this.windup > 0 && !fl) {
+      const k = 1 - this.windup / 0.45;
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = '#ff4a6a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(this.x, this.y, 110, 0, TAU); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,74,106,0.16)';
+      ctx.beginPath(); ctx.arc(this.x, this.y, 110 * k, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    const wind = this.windup > 0 ? 1 + 0.15 * Math.sin(this.windup * 40) : 1;
+    if (drawSprite(ctx, 'monster_elite', this.x, this.y, { size: r * 2.5 * wind, angle: a - Math.PI / 2 })) {
       this.drawHpBar(ctx, r);
       return;
     }

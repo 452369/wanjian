@@ -42,6 +42,7 @@ function drawSprite(ctx, name, x, y, o = {}) {
   ctx.save();
   ctx.translate(x, y);
   if (o.angle) ctx.rotate(o.angle);
+  if (o.sx !== undefined || o.sy !== undefined) ctx.scale(o.sx || 1, o.sy || 1); // 挤压拉伸（动画用）
   if (o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
   if (o.additive) ctx.globalCompositeOperation = 'lighter';
   ctx.drawImage(img, -img.width * k / 2, -img.height * k / 2, img.width * k, img.height * k);
