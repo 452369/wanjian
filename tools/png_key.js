@@ -95,19 +95,21 @@ function encode(w, h, rgba) {
 }
 
 // ---------- 洋红抠图 ----------
-function keyMagenta(img) {
+// AI 生成的洋红底常偏暗（如 RGB 185,20,90，洋红度仅~72），可用可选参数放宽阈值：
+//   node tools/png_key.js in.png out.png key [清除阈值=90] [柔边阈值=30]
+function keyMagenta(img, clearTh = 90, softTh = 30) {
   const { w, h, rgba } = img;
   let cleared = 0, soft = 0;
   for (let i = 0; i < w * h; i++) {
     const di = i * 4;
     let r = rgba[di], g = rgba[di + 1], b = rgba[di + 2];
     const m = Math.min(r, b) - g; // 洋红度：纯#FF00FF = 255，白/青/金 ≤ 0
-    if (m > 90) { rgba[di + 3] = 0; cleared++; }
-    else if (m > 30) { // 边缘半透明 + 去洋红镶边
-      const t = (m - 30) / 60;
+    if (m > clearTh) { rgba[di + 3] = 0; cleared++; }
+    else if (m > softTh) { // 边缘半透明 + 去洋红镶边
+      const t = (m - softTh) / (clearTh - softTh);
       rgba[di + 3] = Math.round(rgba[di + 3] * (1 - t));
-      r = Math.max(g, r - (m - 30));
-      b = Math.max(g, b - (m - 30));
+      r = Math.max(g, r - (m - softTh));
+      b = Math.max(g, b - (m - softTh));
       rgba[di] = r; rgba[di + 2] = b;
       soft++;
     }
@@ -117,14 +119,14 @@ function keyMagenta(img) {
 
 // ---------- 主流程 ----------
 function main() {
-  const [,, src, dst, mode] = process.argv;
-  if (!src || !dst) { console.log('用法: node tools/png_key.js <输入.png> <输出.png> key|copy'); process.exit(1); }
+  const [,, src, dst, mode, clearTh, softTh] = process.argv;
+  if (!src || !dst) { console.log('用法: node tools/png_key.js <输入.png> <输出.png> key|copy [清除阈值] [柔边阈值]'); process.exit(1); }
   const img = decode(fs.readFileSync(src));
   let transparent = 0;
   for (let i = 0; i < img.w * img.h; i++) if (img.rgba[i * 4 + 3] < 128) transparent++;
   console.log(`尺寸 ${img.w}x${img.h}，原透明像素 ${(100 * transparent / (img.w * img.h)).toFixed(1)}%`);
   if (mode === 'key') {
-    const { cleared, soft } = keyMagenta(img);
+    const { cleared, soft } = keyMagenta(img, clearTh ? +clearTh : 90, softTh ? +softTh : 30);
     console.log(`抠图完成：清除 ${cleared} 像素，柔边 ${soft} 像素`);
   }
   fs.writeFileSync(dst, encode(img.w, img.h, img.rgba));
