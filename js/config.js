@@ -1,5 +1,6 @@
 'use strict';
-// ===== 数值配置表：调手感/难度只改这里，不动代码 =====
+// ===== 数值配置表：V0.2 Survivor 化（俯视平面割草）=====
+// 调难度/手感只改这里，不动逻辑代码
 const CFG = {
   view: { w: 540, h: 960 }, // 竖屏逻辑分辨率
 
@@ -7,21 +8,20 @@ const CFG = {
   feel: { shake: true, hitStop: true, dmgNum: true },
 
   player: {
-    hp: 100, radius: 20,
-    laneY: 768,       // 纵向航道：剑仙锁定在这一行，只左右移动（参考弹壳式原地输出）
-    touchSens: 1.6,   // 拖动灵敏度（只作用于横向）
-    keySpeed: 460,    // 键盘调试移动速度 px/s
-    invulnTime: 0.8,  // 受击无敌帧
-    magnetRadius: 110, // 灵气吸取半径（角色不能上下移动，稍大一点保证能吃到）
+    hp: 100, radius: 16,
+    speed: 220,        // 基础移速 px/s（360° 走位）
+    magnetRadius: 200, // 灵气拾取半径（磁力外还有缓速回流，保证升级节奏）
+    invulnTime: 0.7,   // 受击无敌帧
   },
 
-  sword: {
-    damage: 12, speed: 640, volleysPerSec: 2.2,
-    life: 1.5, radius: 10,
-    pierce: 0, critRate: 0.05, critMult: 1.8,
-  },
+  // 御剑术（初始主动）基础参数
+  sword: { damage: 12, cooldown: 0.5, speed: 640, life: 1.5, radius: 10 },
+  crit: { rate: 0.05, mult: 1.8 },
 
-  // 剑品特效档位：达到等级触发"剑品晋升"演出，飞剑外观与命中特效随之升级
+  // 升级所需灵气 = base + level * perLv
+  xp: { base: 4, perLv: 3 },
+
+  // 剑品特效档位：随角色等级晋升（飞剑贴图/颜色随之切换）
   swordTiers: [
     { lv: 1,  name: '凡剑', color: '#cfe8ff' },
     { lv: 5,  name: '灵剑', color: '#54e8c0' },
@@ -31,57 +31,64 @@ const CFG = {
     { lv: 26, name: '剑意', color: '#ff5a8a' },
   ],
 
-  xp: { base: 4, perLv: 3 }, // 升级所需灵气 = base + level * perLv
+  // ===== 技能池 =====
+  skills: {
+    actives: [
+      { id: 'yujian',  icon: '剑', name: '御剑术',   max: 5, desc: n => `飞剑自动索敌，${Math.min(8, n + 1)} 把齐射` },
+      { id: 'jianqi',  icon: '斩', name: '剑气斩',   max: 5, desc: n => `扇形剑气波 ×${1 + Math.floor(n / 2)}，穿透一切` },
+      { id: 'tianlei', icon: '雷', name: '天雷诀',   max: 5, desc: n => `紫雷 ${n + 1} 道随机轰击` },
+      { id: 'huanrao', icon: '环', name: '环绕飞剑', max: 5, desc: n => `${n + 2} 把飞剑绕体旋转` },
+      { id: 'jianyu',  icon: '域', name: '剑域罡气', max: 5, desc: n => `周身剑气领域持续灼烧` },
+      { id: 'wanjian', icon: '灭', name: '万剑归宗', max: 5, desc: n => `周期剑雨轰炸四周` },
+    ],
+    passives: [
+      { id: 'jianxin',    icon: '锋', name: '剑心',   max: 5, desc: () => '伤害 +15%' },
+      { id: 'xunjie',     icon: '疾', name: '迅捷',   max: 5, desc: () => '冷却 -6%，移速 +8%' },
+      { id: 'jianying',   icon: '影', name: '剑影',   max: 5, desc: () => '投射物数量 +1' },
+      { id: 'zongheng',   icon: '围', name: '纵横',   max: 5, desc: () => '技能范围 +12%' },
+      { id: 'changsheng', icon: '春', name: '长生诀', max: 5, desc: () => '每秒回复 0.4% 生命' },
+      { id: 'xiling',     icon: '灵', name: '吸灵',   max: 5, desc: () => '拾取范围 +25%' },
+      { id: 'huixin',     icon: '明', name: '会心',   max: 5, desc: () => '暴击率 +5%，暴伤 +15%' },
+    ],
+  },
 
   monsters: {
-    // 前期平衡：剑伤害12 → 狼妖28血 = 三剑必杀（36伤害）；蝠妖16 = 两剑；符鬼36 = 三剑
-    wolf:  { name: '狼妖', hp: 28, speed: 140, radius: 17, dmg: 12, xp: 2 },
-    bat:   { name: '蝠妖', hp: 16, speed: 90,  radius: 14, dmg: 8,  xp: 2, sineAmp: 70, sineFreq: 3.2 },
-    ghost: { name: '符鬼', hp: 36, speed: 75,  radius: 16, dmg: 8,  xp: 4,
-             shootGap: 2.3, bulletSpeed: 230, bulletDmg: 10 },
-    elite: { name: '妖将', hp: 400, speed: 80, radius: 30, dmg: 22, xp: 0, orbBurst: 16 },
-    boss:  { name: '黑山老妖', hp: 4200, speed: 62, radius: 46, dmg: 30,
-             radialCount: 12, radialGap: 3.2, bulletSpeed: 205,
-             dashGap: 4.5, dashSpeed: 540, phase2At: 0.5, xp: 0 },
+    // 前期手感约定：剑伤12 → 狼妖24血 = 两剑死，三剑必杀有富余
+    wolf:  { name: '狼妖', hp: 24, speed: 135, radius: 16, dmg: 12, xp: 3 },
+    bat:   { name: '蝠妖', hp: 16, speed: 105, radius: 13, dmg: 8,  xp: 3, sineAmp: 60, sineFreq: 3 },
+    ghost: { name: '符鬼', hp: 36, speed: 82,  radius: 15, dmg: 8,  xp: 5,
+             keepDist: 300, shootGap: 2.4, bulletSpeed: 220, bulletDmg: 10 },
+    elite: { name: '妖将', hp: 380, speed: 88, radius: 28, dmg: 22, xp: 0, orbBurst: 16, gold: 15 },
+    boss:  { name: '黑山老妖', hp: 5200, speed: 72, radius: 44, dmg: 30,
+             radialCount: 14, radialGap: 3.0, bulletSpeed: 200,
+             dashGap: 4.5, dashSpeed: 500, phase2At: 0.5, xp: 60, gold: 60 },
   },
 
   bullets: { radius: 7, life: 6 },
 
-  // 出怪导演表：按时间推进的章节节奏
+  // ===== Survivor 刷怪导演 =====
   spawn: {
-    maxAlive: 38,
-    phases: [
-      { until: 20,   entries: [{ type: 'wolf',  gap: 1.25, hpMul: 1 }] },
-      { until: 45,   entries: [{ type: 'wolf',  gap: 1.7,  hpMul: 1.15 }, { type: 'bat', gap: 0.9, hpMul: 1 }] },
-      { until: 80,   entries: [{ type: 'bat',   gap: 0.8,  hpMul: 1.3 }, { type: 'ghost', gap: 3.4, hpMul: 1 }, { type: 'wolf', gap: 2.2, hpMul: 1.35 }] },
-      { until: 115,  entries: [{ type: 'bat',   gap: 0.55, hpMul: 1.6 }, { type: 'ghost', gap: 2.6, hpMul: 1.3 }, { type: 'wolf', gap: 1.4, hpMul: 1.6 }] },
-      { until: 9999, entries: [{ type: 'bat',   gap: 0.5,  hpMul: 1.8 }, { type: 'wolf', gap: 1.1, hpMul: 1.8 }, { type: 'ghost', gap: 2.4, hpMul: 1.6 }] },
-    ],
-    elites: [{ at: 55 }, { at: 105 }],
-    bossAt: 140,
+    baseGap: 1.0,     // 初始刷怪间隔（秒）
+    minGap: 0.22,     // 间隔下限
+    rampEvery: 30,    // 每 30 秒一档难度
+    hpRamp: 1.25,     // 每档怪物血量 ×1.25
+    spdRamp: 0.04,    // 每档怪物速度 +4%
+    gapShrink: 0.9,   // 每档刷怪间隔 ×0.9
+    maxAlive: 60,     // 同屏上限（性能红线）
+    elites: [45, 90, 135], // 精英出现时点
+    bossAt: 150,      // Boss 登场（2:30），斩杀即胜利
+    ringPad: 130,     // 刷怪环在视野外多少像素
   },
 
-  // 三选一升级池（icon 用单字，水墨风；max 为可选次数上限）
-  upgrades: [
-    { id: 'sword',  icon: '剑', name: '剑影分身',   desc: n => `飞剑 +1 把（当前 ${n + 1} 把）`, apply: st => st.swordCount++, max: 6, weight: 10 },
-    { id: 'rate',   icon: '迅', name: '御剑迅捷',   desc: () => '攻速 +20%', apply: st => st.volleysPerSec *= 1.2, weight: 10 },
-    { id: 'dmg',    icon: '锋', name: '剑气淬炼',   desc: () => '伤害 +25%', apply: st => st.damage *= 1.25, weight: 10 },
-    { id: 'speed',  icon: '疾', name: '剑速如虹',   desc: () => '飞剑速度 +20%', apply: st => st.speed *= 1.2, weight: 6 },
-    { id: 'crit',   icon: '明', name: '剑心通明',   desc: () => '暴击率 +8%', apply: st => st.critRate += 0.08, weight: 6 },
-    { id: 'critd',  icon: '破', name: '一剑破万法', desc: () => '暴击伤害 +50%', apply: st => st.critMult += 0.5, weight: 5 },
-    { id: 'magnet', icon: '灵', name: '吸灵大法',   desc: () => '灵气吸取范围 +40%', apply: st => st.magnetRadius *= 1.4, weight: 6 },
-    { id: 'hp',     icon: '春', name: '回春诀',     desc: () => '生命上限 +10，并恢复 40 点',
-      apply: (st, p) => { st.maxHp += 10; p.hp = Math.min(st.maxHp, p.hp + CFG.hpUpgradeHeal); }, weight: 6 },
-    { id: 'pierce', icon: '穿', name: '贯穿剑意',   desc: () => '飞剑可贯穿 +1 个敌人', apply: st => st.pierce++, max: 3, weight: 5 },
-  ],
-  hpUpgradeHeal: 40,
-
-  // 雷霆战机式拾取道具（精英/妖将掉落，落地 8 秒消失）
+  // 雷霆式拾取道具（精英掉落）
   pickups: {
     list: ['sword2', 'rage', 'shield', 'nova', 'vacuum'],
     dur: { sword2: 10, rage: 8 },
-    life: 9,
+    life: 12,
   },
 
-  combo: { window: 2.5 }, // 连击保持窗口（秒）
+  combo: { window: 2.5 },
+
+  // 地面：程序化石板地砖尺寸 / 装饰件撒点密度（tile_ch1/deco_* 贴图存在则优先用）
+  ground: { tile: 128, decoCell: 340 },
 };

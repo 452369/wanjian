@@ -1,5 +1,5 @@
 'use strict';
-// ===== 主循环 / 状态机 / 碰撞 / 掉落 / 广告点位 =====
+// ===== 主循环 / 摄像机 / 无限地图 / 碰撞 / 经济 / 广告点位（Survivor 化）=====
 
 function fitCanvas(g) {
   const w = CFG.view.w, h = CFG.view.h;
@@ -12,107 +12,96 @@ function fitCanvas(g) {
   g.ctx.setTransform(s * dpr, 0, 0, s * dpr, 0, 0);
 }
 
-// 背景：夜空 + 明月 + 山峦下滚（御剑飞行感）+ 灵尘
-class Background {
-  constructor() {
-    const W = CFG.view.w, H = CFG.view.h;
-    const c = document.createElement('canvas');
-    c.width = 16; c.height = H;
-    const cg = c.getContext('2d');
-    const gr = cg.createLinearGradient(0, 0, 0, H);
-    gr.addColorStop(0, '#070a1c');
-    gr.addColorStop(0.5, '#0c1130');
-    gr.addColorStop(1, '#181246');
-    cg.fillStyle = gr;
-    cg.fillRect(0, 0, 16, H);
-    this.sky = c;
-    this.stars = Array.from({ length: 46 }, () => ({ x: rand(0, W), y: rand(0, H * 0.75), r: rand(0.5, 1.7), tw: rand(0, TAU) }));
-    this.peaks = [];
-    let y = -100;
-    for (let i = 0; i < 7; i++) {
-      this.peaks.push({ x: rand(40, W - 40), y, w: rand(190, 330), h: rand(110, 200), far: i % 2 === 0 });
-      y -= rand(280, 400);
-    }
-    this.span = -y + 260;
-    this.motes = Array.from({ length: 26 }, () => ({ x: rand(0, W), y: rand(0, H), v: rand(40, 110), r: rand(0.6, 1.8) }));
-    this.t = 0;
-  }
-  update(dt) {
-    this.t += dt;
-    const W = CFG.view.w;
-    for (const p of this.peaks) {
-      p.y += (p.far ? 26 : 60) * dt;
-      if (p.y - p.h > CFG.view.h + 40) {
-        p.y -= this.span;
-        p.x = rand(40, W - 40); p.w = rand(190, 330); p.h = rand(110, 200);
-      }
-    }
-    for (const m of this.motes) {
-      m.y += m.v * dt;
-      if (m.y > CFG.view.h + 4) { m.y = -4; m.x = rand(0, W); }
-    }
-  }
-  draw(ctx) {
-    const W = CFG.view.w, H = CFG.view.h;
-    // AI 贴图优先：assets/bg_ch1_*.png 存在则用三层视差，否则用程序化夜山
-    const sky = Assets.img('bg_ch1_sky');
-    if (sky) {
-      ctx.drawImage(sky, 0, 0, W, H);
-      this.drawStrip(ctx, Assets.img('bg_ch1_far'), 26);
-      this.drawStrip(ctx, Assets.img('bg_ch1_near'), 60);
-    } else {
-      ctx.drawImage(this.sky, 0, 0, 16, H, 0, 0, W, H);
-      // 明月
-      ctx.globalAlpha = 0.9;
-      ctx.drawImage(glowSprite('#f0ead0'), W - 150, 60, 150, 150);
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = '#efe8cf';
-      ctx.beginPath(); ctx.arc(W - 75, 135, 34, 0, TAU); ctx.fill();
-      ctx.fillStyle = 'rgba(200,190,160,0.5)';
-      ctx.beginPath(); ctx.arc(W - 86, 126, 6, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc(W - 66, 146, 4, 0, TAU); ctx.fill();
-      // 星
-      ctx.fillStyle = '#cfd8ff';
-      for (const s of this.stars) {
-        ctx.globalAlpha = 0.3 + 0.4 * (0.5 + 0.5 * Math.sin(this.t * 1.7 + s.tw));
-        ctx.fillRect(s.x, s.y, s.r, s.r);
-      }
-      ctx.globalAlpha = 1;
-      // 山峦（远慢近快，视差下滚）
-      for (const p of this.peaks) {
-        ctx.globalAlpha = p.far ? 0.4 : 0.85;
-        ctx.fillStyle = p.far ? '#243056' : '#141a38';
-        ctx.beginPath();
-        ctx.moveTo(p.x - p.w / 2, p.y);
-        ctx.lineTo(p.x, p.y - p.h);
-        ctx.lineTo(p.x + p.w / 2, p.y);
-        ctx.closePath(); ctx.fill();
-        if (!p.far) {
-          ctx.fillStyle = 'rgba(210,225,255,0.5)';
-          ctx.beginPath();
-          ctx.moveTo(p.x - p.w * 0.09, p.y - p.h * 0.78);
-          ctx.lineTo(p.x, p.y - p.h);
-          ctx.lineTo(p.x + p.w * 0.09, p.y - p.h * 0.78);
-          ctx.closePath(); ctx.fill();
+// 确定性二维哈希：地图装饰走远再走回来位置不变
+function hash2(x, y) {
+  let n = (x | 0) * 374761393 + (y | 0) * 668265263;
+  n = (n ^ (n >> 13)) * 1274126177;
+  n = n ^ (n >> 16);
+  return (n >>> 0) / 4294967295;
+}
+
+// ===== 无限地面：无缝地砖贴图（或程序化石板）+ 哈希撒点装饰件 =====
+class Ground {
+  draw(ctx, game) {
+    const cam = game.cam, W = CFG.view.w, H = CFG.view.h;
+    const T = CFG.ground.tile;
+    const left = cam.x - W / 2, top = cam.y - H / 2;
+    const gx0 = Math.floor(left / T), gx1 = Math.floor((left + W) / T);
+    const gy0 = Math.floor(top / T), gy1 = Math.floor((top + H) / T);
+    const tileImg = Assets.img('tile_ch1');
+    for (let gy = gy0; gy <= gy1; gy++) {
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const sx = gx * T, sy = gy * T;
+        if (tileImg) {
+          ctx.drawImage(tileImg, sx, sy, T, T);
+        } else {
+          const hs = hash2(gx, gy);
+          ctx.fillStyle = hs > 0.5 ? '#161d33' : '#131929';
+          ctx.fillRect(sx, sy, T, T);
+          ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+          ctx.strokeRect(sx + 0.5, sy + 0.5, T - 1, T - 1);
+          if (hs > 0.8) { // 苔藓斑
+            ctx.fillStyle = 'rgba(70,120,90,0.25)';
+            ctx.beginPath(); ctx.arc(sx + T * (0.2 + hs * 0.5), sy + T * 0.7, 7, 0, TAU); ctx.fill();
+          }
         }
       }
-      ctx.globalAlpha = 1;
     }
-    // 灵尘（速度感，两条路径都画）
-    ctx.fillStyle = 'rgba(150,190,255,0.35)';
-    for (const m of this.motes) {
-      ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU); ctx.fill();
+    // 装饰件：大格撒点
+    const DC = CFG.ground.decoCell;
+    const dx0 = Math.floor(left / DC) - 1, dx1 = Math.floor((left + W) / DC) + 1;
+    const dy0 = Math.floor(top / DC) - 1, dy1 = Math.floor((top + H) / DC) + 1;
+    const names = ['deco_lantern', 'deco_bamboo', 'deco_stele', 'deco_incense', 'deco_jar'];
+    for (let cy = dy0; cy <= dy1; cy++) {
+      for (let cx = dx0; cx <= dx1; cx++) {
+        const hs = hash2(cx * 7 + 3, cy * 13 + 5);
+        if (hs > 0.24) continue;
+        const wx = cx * DC + hash2(cx + 31, cy + 17) * DC;
+        const wy = cy * DC + hash2(cx + 53, cy + 71) * DC;
+        const kind = Math.floor(hash2(cx + 91, cy + 37) * 5);
+        if (drawSprite(ctx, names[kind], wx, wy, { size: 92 })) continue;
+        this.decoProcedural(ctx, kind, wx, wy, hs);
+      }
     }
   }
 
-  // 竖向无缝循环的滚动层（贴图上下边缘做渐变透明即可无缝）
-  drawStrip(ctx, img, speed) {
-    if (!img) return;
-    const W = CFG.view.w, H = CFG.view.h;
-    const dh = (img.height / img.width) * W;
-    const off = ((this.t * speed) % dh + dh) % dh;
-    for (let y = off - dh; y < H; y += dh) {
-      ctx.drawImage(img, 0, y, W, dh);
+  // 无贴图时的程序化装饰兜底
+  decoProcedural(ctx, kind, x, y, hs) {
+    switch (kind) {
+      case 0: // 石灯笼
+        ctx.fillStyle = '#3a4258'; ctx.fillRect(x - 10, y - 16, 20, 26);
+        ctx.fillStyle = '#2a3044'; ctx.fillRect(x - 14, y + 8, 28, 6);
+        ctx.fillStyle = '#ffd75a'; ctx.globalAlpha = 0.8;
+        ctx.beginPath(); ctx.arc(x, y - 4, 4, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 1;
+        break;
+      case 1: // 竹丛
+        ctx.strokeStyle = '#3e7a52'; ctx.lineWidth = 3;
+        for (const o of [-6, 0, 7]) {
+          ctx.beginPath(); ctx.moveTo(x + o, y + 14); ctx.lineTo(x + o * 1.4, y - 18); ctx.stroke();
+        }
+        ctx.fillStyle = '#4e8a5e';
+        ctx.beginPath(); ctx.ellipse(x, y - 20, 12, 5, 0.3, 0, TAU); ctx.fill();
+        break;
+      case 2: // 石碑
+        ctx.fillStyle = '#39415a'; ctx.fillRect(x - 9, y - 22, 18, 34);
+        ctx.fillStyle = '#2c3247'; ctx.fillRect(x - 13, y + 10, 26, 6);
+        break;
+      case 3: // 香炉
+        ctx.fillStyle = '#4a4436';
+        ctx.beginPath(); ctx.ellipse(x, y, 12, 8, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(150,190,200,0.35)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.quadraticCurveTo(x + 5, y - 18, x, y - 30); ctx.stroke();
+        break;
+      default: // 酒坛
+        ctx.fillStyle = '#5a4632';
+        ctx.beginPath(); ctx.ellipse(x, y, 10, 13, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#8a3a3a'; ctx.fillRect(x - 5, y - 17, 10, 6);
+        break;
+    }
+    if (hs < 0.06) { // 碎石
+      ctx.fillStyle = 'rgba(120,140,170,0.3)';
+      ctx.beginPath(); ctx.ellipse(x + 26, y + 18, 6, 4, hs * 6, 0, TAU); ctx.fill();
     }
   }
 }
@@ -123,7 +112,7 @@ class Game {
     this.ctx = canvas.getContext('2d');
     this.state = 'title';
     this.buttons = [];
-    this.bg = new Background();
+    this.ground = new Ground();
     this.reset();
     this.lastT = 0;
     Input.init(canvas);
@@ -135,23 +124,26 @@ class Game {
 
   reset() {
     this.player = new Player();
-    this.swords = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, dmg: 0, crit: false, pierce: 0, life: 0, color: '', trail: [], hits: [] })));
+    Skills.recompute(this.player);
+    this.swords = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, dmg: 0, crit: false, life: 0, color: '', tier: 0, trail: [], hits: [] })));
+    this.waves = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, dir: 0, r: 24, dmg: 0, life: 0, color: '', hits: [] })));
+    this.bolts = new EntityList(new Pool(() => ({ x: 0, y: 0, r: 40, w: 12, color: '#c07aff', t: 0, max: 0.28 })));
     this.monsters = new EntityList(new Pool(() => new Monster()));
     this.bullets = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, dmg: 0, r: 6 })));
     this.orbs = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, val: 0, t: 0, attract: false })));
     this.pickups = new EntityList(new Pool(() => ({ x: 0, y: 0, kind: '', t: 0 })));
     this.spawner = new Spawner(this);
+    this.cam = { x: 0, y: 0 };
     this.time = 0;
     this.kills = 0;
+    this.gold = 0;
     this.combo = 0; this.comboT = 0; this.comboPop = 0; this.maxCombo = 0;
-    this.xp = 0; this.pendingLv = 0; this.upCount = {}; this.options = [];
-    this.lastTier = this.player.tier.name;
+    this.xp = 0; this.pendingLv = 0; this.options = [];
     this.reviveUsed = false;
     this.doubled = false;
     this.winTimer = 0;
     this.lastGold = 0;
     this.toastMsg = ''; this.toastT = 0;
-    this.moveDelta = { x: 0, y: 0 };
     FX.clear();
     Cam.reset();
   }
@@ -160,7 +152,7 @@ class Game {
   startRun() {
     this.reset();
     this.state = 'play';
-    FX.showBanner('第一章 · 青云山', '左右拖动走位 · 飞剑自动出鞘');
+    FX.showBanner('第一章 · 青云山', '摇杆走位 · 技能全自动');
   }
 
   onPlayerDead() {
@@ -170,7 +162,6 @@ class Game {
     AudioSys.boom();
   }
 
-  // 广告点位①：复活
   revive() {
     const P = this.player;
     this.reviveUsed = true;
@@ -179,7 +170,7 @@ class Game {
     P.shield = Math.max(P.shield, 1);
     this.clearBullets();
     for (const m of this.monsters.list) {
-      if (!m.boss && !m.dead && dist2(m.x, m.y, P.x, P.y) < 170 * 170) m.die(this);
+      if (!m.boss && !m.dead && dist2(m.x, m.y, P.x, P.y) < 200 * 200) m.die(this);
     }
     FX.showBanner('仙人指路', '剑心不灭，再战！');
     FX.flash(0.3, '#7dd8ff');
@@ -198,9 +189,8 @@ class Game {
     AudioSys.boom();
   }
 
-  // 结算入库：灵石 = 斩妖×2 + 存活秒
   bank(doubled) {
-    const gold = Math.round((this.kills * 2 + this.time) * (doubled ? 2 : 1));
+    const gold = Math.round(this.gold * (doubled ? 2 : 1));
     Meta.data.gold += gold;
     Meta.data.bestKills = Math.max(Meta.data.bestKills, this.kills);
     Meta.data.bestCombo = Math.max(Meta.data.bestCombo, this.maxCombo);
@@ -213,6 +203,15 @@ class Game {
   spawnSword(x, y, a) {
     this.swords.spawn(s => spawnSwordInit(s, x, y, a, this));
   }
+  spawnWave(x, y, a, o) {
+    this.waves.spawn(w => {
+      w.x = x; w.y = y;
+      w.vx = Math.cos(a) * o.speed; w.vy = Math.sin(a) * o.speed;
+      w.dir = a; w.r = o.r; w.dmg = Math.round(o.dmg);
+      w.life = 1.1; w.color = o.color;
+      w.hits.length = 0;
+    });
+  }
   spawnBullet(x, y, a, spd, dmg) {
     this.bullets.spawn(b => {
       b.x = x; b.y = y;
@@ -221,8 +220,11 @@ class Game {
     });
   }
   spawnMonster(type, opts) {
-    const x = opts && opts.x !== undefined ? opts.x : rand(40, CFG.view.w - 40);
-    return this.monsters.spawn(m => m.init(type, x, opts || {}));
+    const p = this.player;
+    const a = rand(0, TAU);
+    const R = Math.max(CFG.view.w, CFG.view.h) / 2 + CFG.spawn.ringPad + rand(0, 110);
+    const x = p.x + Math.cos(a) * R, y = p.y + Math.sin(a) * R;
+    return this.monsters.spawn(m => m.init(type, x, y, opts || {}));
   }
   spawnOrbs(x, y, val) {
     while (val > 0) {
@@ -238,15 +240,14 @@ class Game {
   }
   spawnPickup(x, y) {
     this.pickups.spawn(p => {
-      p.x = clamp(x, 40, CFG.view.w - 40);
-      p.y = clamp(y, 80, CFG.view.h - 80);
+      p.x = x; p.y = y;
       p.kind = choice(CFG.pickups.list);
       p.t = 0;
     });
   }
 
-  nearestMonster(x, y) {
-    let best = null, bd = Infinity;
+  nearestMonster(x, y, maxDist = Infinity) {
+    let best = null, bd = maxDist * maxDist;
     for (const m of this.monsters.list) {
       if (m.dead) continue;
       const d = dist2(x, y, m.x, m.y);
@@ -255,9 +256,29 @@ class Game {
     return best;
   }
 
+  // 范围伤害（天雷/剑雨/剑域）
+  areaDamage(x, y, r, dmg, opts = {}) {
+    for (const m of this.monsters.list) {
+      if (m.dead) continue;
+      if (hitCircle(x, y, r, m.x, m.y, m.r)) m.hit(dmg, false, this, m.x, m.y, opts.silent);
+    }
+  }
+
+  // 落雷/剑雨：光柱视觉 + 范围伤害
+  strike(x, y, r, dmg, color) {
+    this.bolts.spawn(b => {
+      b.x = x; b.y = y; b.r = r;
+      b.w = rand(10, 14); b.color = color;
+      b.t = b.max = 0.28;
+    });
+    this.areaDamage(x, y, r, dmg);
+    Cam.shake(2, 0.12);
+  }
+
   // ---- 成长 ----
   addKill(m) {
     this.kills++;
+    this.gold += m.cfg.gold || 1;
     this.combo++;
     this.comboT = CFG.combo.window;
     this.comboPop = 0.15;
@@ -268,11 +289,18 @@ class Game {
     this.xp += v;
     let need = CFG.xp.base + this.player.level * CFG.xp.perLv;
     while (this.xp >= need) {
+      // 胜利演出期间不弹升级，经验折算灵石
+      if (this.winTimer > 0) {
+        this.xp = 0; this.pendingLv = 0;
+        this.gold += 10;
+        this.toast('经验化灵石 +10');
+        return;
+      }
       this.xp -= need;
       this.player.level++;
       this.pendingLv++;
       AudioSys.levelup();
-      // 剑品晋升演出
+      FX.ring(this.player.x, this.player.y, this.player.tier.color, 24, 340); // 升级脉冲
       const t = this.player.tier;
       if (t.name !== this.lastTier) {
         this.lastTier = t.name;
@@ -285,39 +313,36 @@ class Game {
     }
     if (this.pendingLv > 0) {
       if (this.state !== 'levelup') this.state = 'levelup';
-      this.genOptions();
-    }
-  }
-
-  genOptions() {
-    const avail = CFG.upgrades.filter(u => !u.max || (this.upCount[u.id] || 0) < u.max);
-    const pool = avail.slice();
-    const opts = [];
-    while (opts.length < 3 && pool.length) {
-      let tw = 0;
-      for (const u of pool) tw += u.weight;
-      let r = Math.random() * tw, idx = 0;
-      for (let i = 0; i < pool.length; i++) {
-        r -= pool[i].weight;
-        if (r <= 0) { idx = i; break; }
+      this.options = Skills.rollOptions(this.player);
+      if (!this.options.length) { // 技能全满：转化为灵石
+        this.pendingLv = 0;
+        this.gold += 15;
+        this.toast('技能已全满 · 转化灵石 +15');
+        this.state = 'play';
       }
-      opts.push(pool.splice(idx, 1)[0]);
+      // 升级瞬间全场灵气飞向玩家
+      for (const o of this.orbs.list) o.attract = true;
     }
-    this.options = opts;
   }
 
   chooseUpgrade(i) {
-    const u = this.options[i];
-    if (!u || this.state !== 'levelup') return;
-    u.apply(this.player.stats, this.player);
-    this.upCount[u.id] = (this.upCount[u.id] || 0) + 1;
+    const opt = this.options[i];
+    if (!opt || this.state !== 'levelup') return;
+    Skills.apply(this.player, opt.def.id);
     AudioSys.pickup();
-    FX.text(this.player.x, this.player.y - 46, u.name + '！', '#ffe9b8', 20);
+    FX.text(this.player.x, this.player.y - 46, opt.def.name + '！', '#ffe9b8', 20);
     this.pendingLv--;
-    if (this.pendingLv > 0) this.genOptions();
-    else {
+    if (this.pendingLv > 0) {
+      this.options = Skills.rollOptions(this.player);
+      if (!this.options.length) {
+        this.pendingLv = 0;
+        this.gold += 15;
+        this.toast('技能已全满 · 转化灵石 +15');
+        this.state = 'play';
+      }
+    } else {
       this.state = 'play';
-      this.player.invuln = Math.max(this.player.invuln, 0.6); // 选择后短暂无敌，避免读屏时被围殴
+      this.player.invuln = Math.max(this.player.invuln, 0.6);
     }
   }
 
@@ -339,27 +364,20 @@ class Game {
     AudioSys.pickup();
   }
 
-  // 万剑归宗：全屏剑雨清场
-  nova() {
+  nova() { // 万剑归宗爆发：全屏剑雨
     FX.flash(0.45);
     Cam.shake(10, 0.4);
     Cam.hitStop(0.08);
     AudioSys.boom();
-    const n = 26;
-    for (let i = 0; i < n; i++) {
-      this.spawnSword(this.player.x, this.player.y, (i / n) * TAU);
+    for (let i = 0; i < 26; i++) {
+      this.spawnSword(this.player.x, this.player.y, (i / 26) * TAU);
     }
-    for (const m of this.monsters.list) {
-      if (!m.dead) m.hit(60, false, this);
-    }
+    this.areaDamage(this.player.x, this.player.y, 9999, 60, { silent: true });
     this.clearBullets();
   }
 
-  clearBullets() {
-    for (const b of this.bullets.list) b.dead = true;
-  }
+  clearBullets() { for (const b of this.bullets.list) b.dead = true; }
 
-  // ---- 广告点位占位：接微信激励视频时，把 adStub 换成 wx.createRewardedVideoAdapter ----
   adStub(name, cb) {
     this.toast(`【广告位】${name} · 原型直接发放`);
     cb();
@@ -371,12 +389,8 @@ class Game {
     requestAnimationFrame(tt => this.loop(tt));
     const dt = Math.min(0.033, (t - this.lastT) / 1000 || 0.016);
     this.lastT = t;
-    // 顿帧：冻结世界若干毫秒，但持续渲染（命中定格感）
     let gdt = dt;
-    if (Cam.hitStopT > 0) {
-      Cam.hitStopT -= dt;
-      gdt = 0;
-    }
+    if (Cam.hitStopT > 0) { Cam.hitStopT -= dt; gdt = 0; } // 顿帧：世界冻结数帧
     Cam.update(dt);
     this.update(gdt);
     FX.updateUI(dt);
@@ -384,8 +398,6 @@ class Game {
   }
 
   update(dt) {
-    // 输入始终消费：暂停期间积压的拖动不清账
-    const delta = Input.consumeDelta();
     const taps = Input.takeTaps();
     for (const tp of taps) {
       for (const b of this.buttons) {
@@ -401,7 +413,8 @@ class Game {
 
     if (this.state === 'play') {
       this.time += dt;
-      this.moveDelta = delta;
+      this.cam.x = this.player.x; // 摄像机跟随玩家
+      this.cam.y = this.player.y;
       this.spawner.update(dt);
       this.player.update(dt, this);
       // 飞剑
@@ -410,20 +423,30 @@ class Game {
         s.trail.push({ x: s.x, y: s.y });
         if (s.trail.length > 9) s.trail.shift();
         s.life -= dt;
-        if (s.life <= 0 || s.x < -60 || s.x > CFG.view.w + 60 || s.y < -80 || s.y > CFG.view.h + 60) s.dead = true;
+        if (s.life <= 0 || dist2(s.x, s.y, this.player.x, this.player.y) > 1100 * 1100) s.dead = true;
       }
+      // 剑气波
+      for (const w of this.waves.list) {
+        w.x += w.vx * dt; w.y += w.vy * dt;
+        w.life -= dt;
+        if (w.life <= 0) w.dead = true;
+      }
+      // 光柱
+      for (const b of this.bolts.list) { b.t -= dt; if (b.t <= 0) b.dead = true; }
+      // 妖兽
       for (const m of this.monsters.list) m.update(dt, this);
+      this.separate();
       // 敌弹
       for (const b of this.bullets.list) {
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-        if (b.life <= 0 || b.x < -40 || b.x > CFG.view.w + 40 || b.y < -40 || b.y > CFG.view.h + 40) b.dead = true;
+        if (b.life <= 0 || dist2(b.x, b.y, this.player.x, this.player.y) > 950 * 950) b.dead = true;
       }
-      // 灵气吸附与拾取
-      const mag = this.player.stats.magnetRadius, mag2 = mag * mag;
+      // 灵气
+      const mag = this.player.eff.pickupR, mag2 = mag * mag;
       for (const o of this.orbs.list) {
         o.t += dt;
         const d2 = dist2(o.x, o.y, this.player.x, this.player.y);
-        if (o.attract || d2 < mag2 || this.orbs.list.length > 60) { // 超量灵气强制回收
+        if (o.attract || d2 < mag2 || this.orbs.list.length > 60) {
           o.attract = true;
           const d = Math.sqrt(d2) || 1;
           o.vx += ((this.player.x - o.x) / d) * 1500 * dt;
@@ -431,69 +454,85 @@ class Game {
           const sp = Math.hypot(o.vx, o.vy);
           if (sp > 760) { o.vx *= 760 / sp; o.vy *= 760 / sp; }
         } else {
-          o.vx *= (1 - 2.5 * dt);
-          o.vy = Math.min(o.vy + 60 * dt, 80); // 玩家在固定航道，灵气缓慢下坠便于拾取
+          // 磁力外缓速回流：杀怪掉的经验总会回到玩家手里，升级节奏不断
+          const d = Math.sqrt(d2) || 1;
+          o.vx += ((this.player.x - o.x) / d) * 220 * dt;
+          o.vy += ((this.player.y - o.y) / d) * 220 * dt;
+          const sp = Math.hypot(o.vx, o.vy);
+          if (sp > 175) { o.vx *= 175 / sp; o.vy *= 175 / sp; }
         }
         o.x += o.vx * dt; o.y += o.vy * dt;
-        if (d2 < 24 * 24) {
-          o.dead = true;
-          this.gainXp(o.val);
-          AudioSys.pickup();
-        }
+        if (d2 < 24 * 24) { o.dead = true; this.gainXp(o.val); AudioSys.pickup(); }
       }
-      // 道具下落与拾取（下落速度足够抵达玩家航道）
+      // 道具
       for (const p of this.pickups.list) {
         p.t += dt;
-        p.y += 90 * dt;
         if (p.t > CFG.pickups.life) p.dead = true;
-        else if (hitCircle(p.x, p.y, 24, this.player.x, this.player.y, this.player.r)) {
+        else if (hitCircle(p.x, p.y, 26, this.player.x, this.player.y, this.player.r)) {
           p.dead = true;
           this.applyPickup(p.kind);
         }
       }
       this.collide();
-      // 连击窗口
       if (this.comboT > 0) {
         this.comboT -= dt;
         if (this.comboT <= 0) this.combo = 0;
       }
-      this.bg.update(dt);
-      this.swords.sweep(); this.monsters.sweep(); this.bullets.sweep();
-      this.orbs.sweep(); this.pickups.sweep();
-    } else {
-      this.bg.update(dt);
+      this.swords.sweep(); this.waves.sweep(); this.bolts.sweep();
+      this.monsters.sweep(); this.bullets.sweep(); this.orbs.sweep(); this.pickups.sweep();
     }
-    // Boss 死亡 → 胜利演出缓冲（升级面板冻结世界时也要走到胜利，避免被灵气升级卡住）
+    // Boss 死亡 → 胜利演出（升级面板冻结世界时也要走到胜利，避免被掉落升级卡住）
     if ((this.state === 'play' || this.state === 'levelup') && this.winTimer > 0) {
       this.winTimer -= dt;
-      if (this.winTimer <= 0) {
-        this.state = 'win';
-        this.bank(false);
-      }
+      if (this.winTimer <= 0) { this.state = 'win'; this.bank(false); }
     }
     FX.update(this.state === 'play' ? dt : Math.min(dt, 0.033));
   }
 
+  // 怪物两两分离，避免叠成一团
+  separate() {
+    const ms = this.monsters.list;
+    for (let i = 0; i < ms.length; i++) {
+      for (let j = i + 1; j < ms.length; j++) {
+        const a = ms[i], b = ms[j];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const rr = (a.r + b.r) * 0.8;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > 0.01 && d2 < rr * rr) {
+          const d = Math.sqrt(d2), push = (rr - d) / d * 0.5;
+          a.x -= dx * push; a.y -= dy * push;
+          b.x += dx * push; b.y += dy * push;
+        }
+      }
+    }
+  }
+
   collide() {
     const P = this.player;
-    // 飞剑 × 妖兽（带贯穿）
+    // 飞剑 × 妖兽
     for (const s of this.swords.list) {
       if (s.dead) continue;
       for (const m of this.monsters.list) {
         if (m.dead || s.hits.includes(m.id)) continue;
-        if (hitCircle(s.x, s.y, 10, m.x, m.y, m.r)) {
+        if (hitCircle(s.x, s.y, 12, m.x, m.y, m.r)) {
           m.hit(s.dmg, s.crit, this, s.x, s.y);
-          if (s.pierce > 0) {
-            s.pierce--;
-            s.hits.push(m.id);
-          } else {
-            s.dead = true;
-            break;
-          }
+          s.dead = true;
+          break;
         }
       }
     }
-    // 妖兽 × 玩家（接触伤害）
+    // 剑气波 × 妖兽（穿透）
+    for (const w of this.waves.list) {
+      if (w.dead) continue;
+      for (const m of this.monsters.list) {
+        if (m.dead || w.hits.includes(m.id)) continue;
+        if (hitCircle(w.x, w.y, w.r, m.x, m.y, m.r)) {
+          m.hit(w.dmg, false, this, w.x, w.y);
+          w.hits.push(m.id);
+        }
+      }
+    }
+    // 妖兽 × 玩家
     if (P.invuln <= 0) {
       for (const m of this.monsters.list) {
         if (!m.dead && hitCircle(m.x, m.y, m.r * 0.85, P.x, P.y, P.r)) {
@@ -517,10 +556,9 @@ class Game {
   draw() {
     const ctx = this.ctx, W = CFG.view.w, H = CFG.view.h;
     this.buttons.length = 0;
-    this.bg.draw(ctx);
     ctx.save();
-    ctx.translate(Cam.ox, Cam.oy); // 震屏只作用于世界层
-    // 道具 → 灵气 → 妖兽 → 敌弹 → 玩家 → 飞剑 → 粒子
+    ctx.translate(W / 2 - this.cam.x + Cam.ox, H / 2 - this.cam.y + Cam.oy); // 摄像机 + 震屏
+    this.ground.draw(ctx, this);
     for (const p of this.pickups.list) drawPickup(ctx, p);
     for (const o of this.orbs.list) {
       if (drawSprite(ctx, 'orb_spirit', o.x, o.y, { size: 16 })) continue;
@@ -539,6 +577,7 @@ class Game {
     }
     if (this.state !== 'over' || this.player.hp > 0) this.player.draw(ctx);
     for (const s of this.swords.list) drawSword(ctx, s);
+    Skills.drawWorld(ctx, this);
     FX.draw(ctx);
     ctx.restore();
     Screens.drawUI(this);
@@ -560,7 +599,7 @@ class Game {
 }
 
 window.addEventListener('load', () => {
-  Assets.preload(); // 拉取 assets/ 下的 AI 贴图（缺失自动回退程序化造型）
+  Assets.preload();
   const g = new Game(document.getElementById('cv'));
-  window.game = g; // 调试钩子：控制台可用 game.gainXp(500) / game.spawner.time = 139 等
+  window.game = g; // 调试钩子：game.gainXp(500) / game.spawner.time = 149 / 泵帧 game.update(1/60)
 });
