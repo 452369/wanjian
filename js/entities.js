@@ -223,8 +223,8 @@ function drawSword(ctx, s) {
     ctx.globalAlpha = 1;
   }
   const a = Math.atan2(s.vy, s.vx);
-  // AI 贴图优先（剑尖朝上的飞剑贴图，按速度方向旋转）
-  if (drawSprite(ctx, 'sword_tier' + (s.tier || 0), s.x, s.y, { size: 30, angle: a + Math.PI / 2 })) return;
+  // AI 贴图优先：带透明通道的发光贴图（亮度键控抠底），按速度方向旋转
+  if (drawSprite(ctx, 'sword_tier' + (s.tier || 0), s.x, s.y, { size: 48, angle: a + Math.PI / 2 })) return;
   ctx.save();
   ctx.translate(s.x, s.y);
   ctx.rotate(a + Math.PI / 2);
