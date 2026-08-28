@@ -12,7 +12,7 @@ const Skills = {
       projBonus: s.jianying || 0,
       areaMul: 1 + 0.12 * (s.zongheng || 0),
       regen: 0.004 * (s.changsheng || 0), // 每秒回复最大生命百分比
-      pickupR: CFG.player.magnetRadius * (1 + 0.25 * (s.xiling || 0)),
+      dmgReduce: Math.min(0.4, 0.08 * (s.tiebi || 0)), // 铁壁：受伤减免（上限40%）
       critRate: CFG.crit.rate + 0.05 * (s.huixin || 0),
       critMult: CFG.crit.mult + 0.15 * (s.huixin || 0),
     };
@@ -28,7 +28,10 @@ const Skills = {
     for (const d of [...CFG.skills.actives, ...CFG.skills.passives]) {
       const lv = p.skills[d.id] || 0;
       if (lv >= d.max) continue;
-      pool.push({ def: d, next: lv + 1, isNew: lv === 0, weight: lv > 0 ? 14 : 10 });
+      // 环绕飞剑前期权重加成：开局就能拿到"护主"技能
+      let weight = lv > 0 ? 14 : 10;
+      if (d.id === 'huanrao' && lv === 0 && p.level <= 6) weight = 18;
+      pool.push({ def: d, next: lv + 1, isNew: lv === 0, weight });
     }
     const opts = [];
     while (opts.length < 3 && pool.length) {
@@ -55,7 +58,7 @@ const Skills = {
     p.cdYujian = (p.cdYujian || 0) - dt;
     if ((s.yujian || 0) > 0 && p.cdYujian <= 0) {
       p.cdYujian = CFG.sword.cooldown * e.cdMul * rageCd;
-      const count = Math.min(10, s.yujian + e.projBonus + (p.buffs.sword2 ? 2 : 0));
+      const count = Math.min(10, s.yujian + 1 + e.projBonus + (p.buffs.sword2 ? 2 : 0));
       const m = game.nearestMonster(p.x, p.y, 640);
       const base = m ? Math.atan2(m.y - p.y, m.x - p.x) : Math.atan2(p.face.y, p.face.x);
       for (let i = 0; i < count; i++) {
@@ -110,17 +113,17 @@ const Skills = {
       AudioSys.boom();
     }
 
-    // 环绕飞剑：绕体旋转，接触伤害（每怪独立冷却）
+    // 环绕飞剑：护主剑阵，绕体旋转，接触伤害（每怪独立冷却）
     if ((s.huanrao || 0) > 0) {
       p.orbitA = (p.orbitA || 0) + dt * 3.2;
-      const count = s.huanrao + 1 + Math.floor(e.projBonus / 2);
-      const R = (66 + 6 * s.huanrao) * e.areaMul;
+      const count = s.huanrao + 2 + Math.floor(e.projBonus / 2);
+      const R = (70 + 8 * s.huanrao) * e.areaMul;
       p.orbPos = [];
       for (let i = 0; i < count; i++) {
         const a = p.orbitA + (i / count) * TAU;
         p.orbPos.push({ x: p.x + Math.cos(a) * R, y: p.y + Math.sin(a) * R });
       }
-      const dmg = (10 + 6 * s.huanrao) * e.dmgMul;
+      const dmg = (12 + 8 * s.huanrao) * e.dmgMul;
       for (const m of game.monsters.list) {
         if (m.dead) continue;
         m.orbCd = (m.orbCd || 0) - dt;
@@ -164,7 +167,10 @@ const Skills = {
     if (p.orbPos) {
       for (const o of p.orbPos) {
         const a = Math.atan2(o.y - p.y, o.x - p.x);
-        if (drawSprite(ctx, 'sword_tier' + p.tierIndex, o.x, o.y, { size: 44, angle: a + Math.PI / 2 })) continue;
+        ctx.globalAlpha = 0.3;
+        ctx.drawImage(glowSprite(p.tier.color), o.x - 20, o.y - 20, 40, 40);
+        ctx.globalAlpha = 1;
+        if (drawSprite(ctx, 'sword_tier' + p.tierIndex, o.x, o.y, { size: 48, angle: a + Math.PI / 2 })) continue;
         ctx.save();
         ctx.translate(o.x, o.y); ctx.rotate(a + Math.PI / 2);
         drawBlade(ctx, 0, 0, 30, p.tier.color);

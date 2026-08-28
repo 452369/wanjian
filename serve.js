@@ -36,7 +36,7 @@ http.createServer((req, res) => {
       });
       fs.createReadStream(file, { start, end }).pipe(res);
     } else {
-      res.writeHead(200, { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': st.size });
+      res.writeHead(200, { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': st.size, 'Cache-Control': 'no-cache' });
       fs.createReadStream(file).pipe(res);
     }
   });

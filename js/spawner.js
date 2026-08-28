@@ -38,7 +38,7 @@ class Spawner {
       return;
     }
 
-    // 常规环形刷怪
+    // 常规刷怪：成群结队从同一方向压过来（围城感）
     const idx = this.rampIdx();
     this.cd -= dt;
     if (this.cd <= 0 && this.g.monsters.list.length < S.maxAlive) {
@@ -47,7 +47,16 @@ class Spawner {
       if (this.time > 25) pool.push('bat');
       if (this.time > 60) pool.push('bat', 'ghost');
       if (this.time > 100) pool.push('ghost');
-      this.g.spawnMonster(choice(pool), { hpMul: this.hpMul(), spdMul: this.spdMul() });
+      const type = choice(pool);
+      const packN = Math.max(1, Math.min(S.packMax, S.packMin + Math.floor(idx / 1.2),
+                                        S.maxAlive - this.g.monsters.list.length));
+      const angle = rand(0, TAU); // 一群从同一方向压来
+      for (let k = 0; k < packN; k++) {
+        this.g.spawnMonster(type, {
+          hpMul: this.hpMul(), spdMul: this.spdMul(),
+          angle: angle + rand(-0.35, 0.35), distJitter: rand(0, 110),
+        });
+      }
     }
   }
 }

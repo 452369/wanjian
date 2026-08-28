@@ -29,7 +29,7 @@ class Player {
     this.level = 1;
     this.stats = { maxHp: CFG.player.hp };
     this.hp = this.stats.maxHp;
-    this.skills = { yujian: 1 };   // 技能等级表
+    this.skills = { yujian: 2, jianqi: 1 }; // 开局强力：双剑齐射 + 剑气斩护身
     this.eff = {};                 // 被动加成（Skills.recompute 填充）
     this.buffs = {};               // 拾取临时增益 {sword2, rage}
     this.shield = 0;
@@ -81,6 +81,7 @@ class Player {
       AudioSys.kill(); Cam.shake(5);
       return;
     }
+    dmg = Math.round(dmg * (1 - (this.eff.dmgReduce || 0))); // 铁壁减伤
     this.hp -= dmg;
     this.invuln = CFG.player.invulnTime;
     FX.spark(this.x, this.y, '#ff6b6b', 10, 220);
@@ -365,10 +366,9 @@ class Monster {
     game.addKill(this);
     FX.soul(this.x, this.y, game.player, this.boss ? 18 : this.elite ? 10 : 4);
     FX.spark(this.x, this.y, '#a8e6ff', 12, 260);
-    if (this.cfg.xp > 0) game.spawnOrbs(this.x, this.y, this.cfg.xp);
-    if (this.elite) {
+    if (this.elite) { // 斩妖将：掉宝 + 直升小半级
       game.spawnPickup(this.x, this.y);
-      game.spawnOrbs(this.x, this.y, this.cfg.orbBurst);
+      game.addKillProgress(4);
       Cam.shake(6); AudioSys.boom();
     }
     if (this.boss) game.onBossDead(this);

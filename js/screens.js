@@ -77,12 +77,12 @@ const Screens = {
   // ---- 战斗 HUD ----
   hud(g) {
     const ctx = g.ctx, W = CFG.view.w, H = CFG.view.h, P = g.player;
-    // 经验条（顶部通栏）
-    const need = CFG.xp.base + P.level * CFG.xp.perLv;
+    // 升级进度条（击杀直接涨级）
+    const need = CFG.levelup.base + (P.level - 1) * CFG.levelup.per;
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(0, 0, W, 8);
     ctx.fillStyle = P.tier.color;
-    ctx.fillRect(0, 0, W * clamp(g.xp / need, 0, 1), 8);
+    ctx.fillRect(0, 0, W * clamp(g.killsProg / need, 0, 1), 8);
     // 等级与剑品
     ctx.textAlign = 'left';
     ctx.fillStyle = '#cfe8ff';
@@ -208,19 +208,24 @@ const Screens = {
     }
   },
 
-  // 虚拟摇杆可视化
+  // 虚拟摇杆：固定在屏幕下方
   joystick(g) {
-    if (!Input.joyActive) return;
     const ctx = g.ctx;
-    ctx.globalAlpha = 0.35;
-    ctx.beginPath(); ctx.arc(Input.jx0, Input.jy0, 44, 0, TAU);
+    const JX = 110, JY = CFG.view.h - 150;
+    const act = Input.joyActive;
+    ctx.globalAlpha = act ? 0.4 : 0.15;
+    ctx.beginPath(); ctx.arc(JX, JY, 52, 0, TAU);
     ctx.strokeStyle = '#cfe8ff'; ctx.lineWidth = 2; ctx.stroke();
-    let dx = Input.curX - Input.jx0, dy = Input.curY - Input.jy0;
-    const d = Math.hypot(dx, dy);
-    if (d > 44) { dx *= 44 / d; dy *= 44 / d; }
-    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = 'rgba(120,160,220,0.12)'; ctx.fill();
+    let dx = 0, dy = 0;
+    if (act) {
+      dx = Input.curX - Input.jx0; dy = Input.curY - Input.jy0;
+      const d = Math.hypot(dx, dy);
+      if (d > 52) { dx *= 52 / d; dy *= 52 / d; }
+      ctx.globalAlpha = 0.6;
+    } else ctx.globalAlpha = 0.2;
     ctx.fillStyle = '#cfe8ff';
-    ctx.beginPath(); ctx.arc(Input.jx0 + dx, Input.jy0 + dy, 20, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(JX + dx, JY + dy, 22, 0, TAU); ctx.fill();
     ctx.globalAlpha = 1;
   },
 

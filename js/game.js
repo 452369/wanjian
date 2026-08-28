@@ -130,15 +130,15 @@ class Game {
     this.bolts = new EntityList(new Pool(() => ({ x: 0, y: 0, r: 40, w: 12, color: '#c07aff', t: 0, max: 0.28 })));
     this.monsters = new EntityList(new Pool(() => new Monster()));
     this.bullets = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, dmg: 0, r: 6 })));
-    this.orbs = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, val: 0, t: 0, attract: false })));
     this.pickups = new EntityList(new Pool(() => ({ x: 0, y: 0, kind: '', t: 0 })));
     this.spawner = new Spawner(this);
     this.cam = { x: 0, y: 0 };
     this.time = 0;
     this.kills = 0;
     this.gold = 0;
+    this.killsProg = 0; // 本级已击杀数（击杀直接涨级）
     this.combo = 0; this.comboT = 0; this.comboPop = 0; this.maxCombo = 0;
-    this.xp = 0; this.pendingLv = 0; this.options = [];
+    this.pendingLv = 0; this.options = [];
     this.reviveUsed = false;
     this.doubled = false;
     this.winTimer = 0;
@@ -180,7 +180,6 @@ class Game {
 
   onBossDead(m) {
     this.winTimer = 1.4;
-    this.spawnOrbs(m.x, m.y, 60);
     this.spawnPickup(m.x, m.y - 40);
     this.clearBullets();
     FX.flash(0.6);
@@ -221,22 +220,12 @@ class Game {
   }
   spawnMonster(type, opts) {
     const p = this.player;
-    const a = rand(0, TAU);
-    const R = Math.max(CFG.view.w, CFG.view.h) / 2 + CFG.spawn.ringPad + rand(0, 110);
+    const o = opts || {};
+    const a = o.angle !== undefined ? o.angle : rand(0, TAU);
+    const R = Math.max(CFG.view.w, CFG.view.h) / 2 + CFG.spawn.ringPad
+            + (o.distJitter !== undefined ? o.distJitter : rand(0, 110));
     const x = p.x + Math.cos(a) * R, y = p.y + Math.sin(a) * R;
-    return this.monsters.spawn(m => m.init(type, x, y, opts || {}));
-  }
-  spawnOrbs(x, y, val) {
-    while (val > 0) {
-      const v = Math.min(val, randi(1, 3));
-      val -= v;
-      this.orbs.spawn(o => {
-        o.x = x + rand(-12, 12); o.y = y + rand(-12, 12);
-        const a = rand(0, TAU), s = rand(40, 160);
-        o.vx = Math.cos(a) * s; o.vy = Math.sin(a) * s;
-        o.val = v; o.t = 0; o.attract = false;
-      });
-    }
+    return this.monsters.spawn(m => m.init(type, x, y, o));
   }
   spawnPickup(x, y) {
     this.pickups.spawn(p => {
@@ -283,20 +272,16 @@ class Game {
     this.comboT = CFG.combo.window;
     this.comboPop = 0.15;
     this.maxCombo = Math.max(this.maxCombo, this.combo);
+    this.addKillProgress(1);
   }
 
-  gainXp(v) {
-    this.xp += v;
-    let need = CFG.xp.base + this.player.level * CFG.xp.perLv;
-    while (this.xp >= need) {
-      // 胜利演出期间不弹升级，经验折算灵石
-      if (this.winTimer > 0) {
-        this.xp = 0; this.pendingLv = 0;
-        this.gold += 10;
-        this.toast('经验化灵石 +10');
-        return;
-      }
-      this.xp -= need;
+  // 击杀直接涨级（无经验球）：加击杀进度并尝试突破
+  addKillProgress(n) {
+    this.killsProg += n;
+    let need = CFG.levelup.base + (this.player.level - 1) * CFG.levelup.per;
+    while (this.killsProg >= need) {
+      this.killsProg -= need;
+      if (this.winTimer > 0) { this.gold += 10; continue; } // 胜利演出期间折灵石
       this.player.level++;
       this.pendingLv++;
       AudioSys.levelup();
@@ -309,19 +294,17 @@ class Game {
         Cam.shake(4, 0.3);
         AudioSys.tierUp();
       }
-      need = CFG.xp.base + this.player.level * CFG.xp.perLv;
+      need = CFG.levelup.base + (this.player.level - 1) * CFG.levelup.per;
     }
-    if (this.pendingLv > 0) {
-      if (this.state !== 'levelup') this.state = 'levelup';
+    if (this.pendingLv > 0 && this.state === 'play') {
       this.options = Skills.rollOptions(this.player);
       if (!this.options.length) { // 技能全满：转化为灵石
         this.pendingLv = 0;
         this.gold += 15;
         this.toast('技能已全满 · 转化灵石 +15');
-        this.state = 'play';
+      } else {
+        this.state = 'levelup';
       }
-      // 升级瞬间全场灵气飞向玩家
-      for (const o of this.orbs.list) o.attract = true;
     }
   }
 
@@ -356,9 +339,6 @@ class Game {
       case 'rage': P.buffs.rage = CFG.pickups.dur.rage; break;
       case 'shield': P.shield = Math.min(2, P.shield + 1); break;
       case 'nova': this.nova(); break;
-      case 'vacuum':
-        for (const o of this.orbs.list) o.attract = true;
-        break;
     }
     Cam.shake(4);
     AudioSys.pickup();
@@ -441,29 +421,6 @@ class Game {
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
         if (b.life <= 0 || dist2(b.x, b.y, this.player.x, this.player.y) > 950 * 950) b.dead = true;
       }
-      // 灵气
-      const mag = this.player.eff.pickupR, mag2 = mag * mag;
-      for (const o of this.orbs.list) {
-        o.t += dt;
-        const d2 = dist2(o.x, o.y, this.player.x, this.player.y);
-        if (o.attract || d2 < mag2 || this.orbs.list.length > 60) {
-          o.attract = true;
-          const d = Math.sqrt(d2) || 1;
-          o.vx += ((this.player.x - o.x) / d) * 1500 * dt;
-          o.vy += ((this.player.y - o.y) / d) * 1500 * dt;
-          const sp = Math.hypot(o.vx, o.vy);
-          if (sp > 760) { o.vx *= 760 / sp; o.vy *= 760 / sp; }
-        } else {
-          // 磁力外缓速回流：杀怪掉的经验总会回到玩家手里，升级节奏不断
-          const d = Math.sqrt(d2) || 1;
-          o.vx += ((this.player.x - o.x) / d) * 220 * dt;
-          o.vy += ((this.player.y - o.y) / d) * 220 * dt;
-          const sp = Math.hypot(o.vx, o.vy);
-          if (sp > 175) { o.vx *= 175 / sp; o.vy *= 175 / sp; }
-        }
-        o.x += o.vx * dt; o.y += o.vy * dt;
-        if (d2 < 24 * 24) { o.dead = true; this.gainXp(o.val); AudioSys.pickup(); }
-      }
       // 道具
       for (const p of this.pickups.list) {
         p.t += dt;
@@ -479,7 +436,7 @@ class Game {
         if (this.comboT <= 0) this.combo = 0;
       }
       this.swords.sweep(); this.waves.sweep(); this.bolts.sweep();
-      this.monsters.sweep(); this.bullets.sweep(); this.orbs.sweep(); this.pickups.sweep();
+      this.monsters.sweep(); this.bullets.sweep(); this.pickups.sweep();
     }
     // Boss 死亡 → 胜利演出（升级面板冻结世界时也要走到胜利，避免被掉落升级卡住）
     if ((this.state === 'play' || this.state === 'levelup') && this.winTimer > 0) {
@@ -560,14 +517,6 @@ class Game {
     ctx.translate(W / 2 - this.cam.x + Cam.ox, H / 2 - this.cam.y + Cam.oy); // 摄像机 + 震屏
     this.ground.draw(ctx, this);
     for (const p of this.pickups.list) drawPickup(ctx, p);
-    for (const o of this.orbs.list) {
-      if (drawSprite(ctx, 'orb_spirit', o.x, o.y, { size: 16 })) continue;
-      ctx.globalAlpha = 0.8;
-      ctx.drawImage(glowSprite('#54e8c0'), o.x - 8, o.y - 8, 16, 16);
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = '#bfffe8';
-      ctx.beginPath(); ctx.arc(o.x, o.y, 2.8, 0, TAU); ctx.fill();
-    }
     for (const m of this.monsters.list) m.draw(ctx, this);
     for (const b of this.bullets.list) {
       if (drawSprite(ctx, 'bullet_enemy', b.x, b.y, { size: 22 })) continue;
@@ -599,7 +548,8 @@ class Game {
 }
 
 window.addEventListener('load', () => {
+  window.__VER = 'v0.2.2-swarm'; // 调试：核实浏览器加载的是最新代码
   Assets.preload();
   const g = new Game(document.getElementById('cv'));
-  window.game = g; // 调试钩子：game.gainXp(500) / game.spawner.time = 149 / 泵帧 game.update(1/60)
+  window.game = g; // 调试钩子：game.player.level=20 / game.spawner.time = 149 / 泵帧 game.update(1/60)
 });
