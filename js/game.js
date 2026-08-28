@@ -63,6 +63,29 @@ class Ground {
         this.decoProcedural(ctx, kind, wx, wy, hs);
       }
     }
+    // ===== 灵气结界边界（特效线）=====
+    const A = CFG.arena;
+    ctx.fillStyle = 'rgba(2,4,10,0.5)';
+    if (left < 0) ctx.fillRect(left, top, -left, H);
+    if (top < 0) ctx.fillRect(left, top, W, -top);
+    if (left + W > A.w) ctx.fillRect(A.w, top, left + W - A.w, H);
+    if (top + H > A.h) ctx.fillRect(left, A.h, W, top + H - A.h);
+    const pulse = 0.55 + 0.25 * Math.sin(game.time * 3);
+    ctx.save();
+    ctx.strokeStyle = '#54e8c0';
+    ctx.shadowColor = '#54e8c0';
+    ctx.shadowBlur = 16;
+    ctx.globalAlpha = pulse;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, 0, A.w, A.h); // 结界主线（呼吸发光）
+    ctx.globalAlpha = pulse * 0.65;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = '#cfe8ff';
+    ctx.setLineDash([26, 18]);
+    ctx.lineDashOffset = -game.time * 60; // 流动符文虚线
+    ctx.strokeRect(12, 12, A.w - 24, A.h - 24);
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   // 无贴图时的程序化装饰兜底
@@ -132,7 +155,7 @@ class Game {
     this.bullets = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, dmg: 0, r: 6 })));
     this.pickups = new EntityList(new Pool(() => ({ x: 0, y: 0, kind: '', t: 0 })));
     this.spawner = new Spawner(this);
-    this.cam = { x: 0, y: 0 };
+    this.cam = { x: this.player.x, y: this.player.y };
     this.time = 0;
     this.kills = 0;
     this.gold = 0;
@@ -224,7 +247,9 @@ class Game {
     const a = o.angle !== undefined ? o.angle : rand(0, TAU);
     const R = Math.max(CFG.view.w, CFG.view.h) / 2 + CFG.spawn.ringPad
             + (o.distJitter !== undefined ? o.distJitter : rand(0, 110));
-    const x = p.x + Math.cos(a) * R, y = p.y + Math.sin(a) * R;
+    // 刷怪点夹进结界内
+    const x = clamp(p.x + Math.cos(a) * R, 30, CFG.arena.w - 30);
+    const y = clamp(p.y + Math.sin(a) * R, 30, CFG.arena.h - 30);
     return this.monsters.spawn(m => m.init(type, x, y, o));
   }
   spawnPickup(x, y) {
@@ -393,8 +418,9 @@ class Game {
 
     if (this.state === 'play') {
       this.time += dt;
-      this.cam.x = this.player.x; // 摄像机跟随玩家
-      this.cam.y = this.player.y;
+      // 摄像机跟随玩家（夹在结界内，视野不越界）
+      this.cam.x = clamp(this.player.x, CFG.view.w / 2, Math.max(CFG.view.w / 2, CFG.arena.w - CFG.view.w / 2));
+      this.cam.y = clamp(this.player.y, CFG.view.h / 2, Math.max(CFG.view.h / 2, CFG.arena.h - CFG.view.h / 2));
       this.spawner.update(dt);
       this.player.update(dt, this);
       // 飞剑
@@ -416,6 +442,11 @@ class Game {
       // 妖兽
       for (const m of this.monsters.list) m.update(dt, this);
       this.separate();
+      // 妖兽同样受结界约束
+      for (const m of this.monsters.list) {
+        m.x = clamp(m.x, 16, CFG.arena.w - 16);
+        m.y = clamp(m.y, 16, CFG.arena.h - 16);
+      }
       // 敌弹
       for (const b of this.bullets.list) {
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;

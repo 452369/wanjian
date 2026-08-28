@@ -24,7 +24,7 @@ function drawBlade(ctx, x, y, len, color) {
 // ===== 玩家：剑仙（360° 走位，技能全自动）=====
 class Player {
   constructor() {
-    this.x = 0; this.y = 0;
+    this.x = CFG.arena.w / 2; this.y = CFG.arena.h / 2; // 开局在结界中央
     this.r = CFG.player.radius;
     this.level = 1;
     this.stats = { maxHp: CFG.player.hp };
@@ -62,6 +62,9 @@ class Player {
     }
     this.x += j.x * this.eff.speed * dt;
     this.y += j.y * this.eff.speed * dt;
+    // 灵气结界边界
+    this.x = clamp(this.x, CFG.arena.margin, CFG.arena.w - CFG.arena.margin);
+    this.y = clamp(this.y, CFG.arena.margin, CFG.arena.h - CFG.arena.margin);
     // buff 计时
     for (const key in this.buffs) {
       this.buffs[key] -= dt;

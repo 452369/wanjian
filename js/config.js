@@ -81,6 +81,9 @@ const CFG = {
     ringPad: 60,      // 刷怪环贴近视野边缘，怪涌进来的压迫感
   },
 
+  // 灵气结界：有限竞技场，边界用发光特效线封闭
+  arena: { w: 1600, h: 2400, margin: 26 },
+
   // 雷霆式拾取道具（精英掉落）
   pickups: {
     list: ['sword2', 'rage', 'shield', 'nova'],
