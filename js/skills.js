@@ -169,16 +169,22 @@ const Skills = {
       ctx.strokeStyle = p.tier.color; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.auraR, 0, TAU); ctx.stroke();
       ctx.globalAlpha = 1;
-      const tor = Assets.img('fx_tornado'); // 剑气龙卷贴图
-      if (tor) {
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.5;
-        ctx.translate(p.x, p.y);
-        ctx.rotate(game.time * 1.5);
-        const ts = p.auraR * 2.4;
-        ctx.drawImage(tor, -ts / 2, -ts / 2, ts, ts);
-        ctx.restore();
+      // 剑气龙卷：雪碧图循环优先，回退静态图
+      if (!drawFx(ctx, 'fx_tornado', p.x, p.y, {
+        size: p.auraR * 2.4, additive: true, alpha: 0.5,
+        t: game.time, fps: 10, loop: true,
+      })) {
+        const tor = Assets.img('fx_tornado');
+        if (tor) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = 0.5;
+          ctx.translate(p.x, p.y);
+          ctx.rotate(game.time * 1.5);
+          const tsz = p.auraR * 2.4;
+          ctx.drawImage(tor, -tsz / 2, -tsz / 2, tsz, tsz);
+          ctx.restore();
+        }
       }
     }
     if (p.orbPos) {
@@ -196,10 +202,11 @@ const Skills = {
       }
     }
     for (const w of game.waves.list) {
-      // fx_slash 贴图优先：月牙剑气随方向旋转
-      if (drawSprite(ctx, 'fx_slash', w.x, w.y, {
+      // fx_slash 雪碧图动画优先（无 sheet 回退静态图/程序化月牙）
+      if (drawFx(ctx, 'fx_slash', w.x, w.y, {
         size: w.r * 4.4, angle: w.dir + Math.PI / 4,
         additive: true, alpha: clamp(w.life / 0.35, 0, 1) * 0.95,
+        t: 1.1 - w.life, fps: 12,
       })) continue;
       ctx.save();
       ctx.translate(w.x, w.y); ctx.rotate(w.dir);

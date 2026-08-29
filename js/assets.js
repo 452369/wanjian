@@ -16,7 +16,8 @@ const ASSET_LIST = [
   'boss_heishan', 'boss_heishan_rage',             // Boss 两形态
   'pickup_sword2', 'pickup_rage', 'pickup_shield', // 掉落道具五枚
   'pickup_nova', 'pickup_vacuum',
-  'fx_slash', 'fx_nova', 'fx_tornado', 'fx_tierup', 'fx_splat', // 技能特效（待接入演出）
+  'fx_slash', 'fx_nova', 'fx_tornado', 'fx_tierup', 'fx_splat', // 技能特效
+  'fx_slash_sheet', 'fx_nova_sheet', 'fx_tornado_sheet', 'fx_tierup_sheet', // 特效动画雪碧图（可选）
   'tile_ch1',                                       // 俯视无缝地砖（Survivor 化用）
   'deco_lantern', 'deco_incense', 'deco_bamboo',    // 地图装饰件（待撒点渲染）
   'deco_stele', 'deco_jar',
@@ -46,6 +47,33 @@ function drawSprite(ctx, name, x, y, o = {}) {
   if (o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
   if (o.additive) ctx.globalCompositeOperation = 'lighter';
   ctx.drawImage(img, -img.width * k / 2, -img.height * k / 2, img.width * k, img.height * k);
+  ctx.restore();
+  return true;
+}
+
+// 特效雪碧图帧播放：存在 基名_sheet.png（横排正方形单帧）→ 按帧播放；否则回退静态 基名.png
+// o: {size, angle, additive, alpha, t(剪辑时间), fps, loop}
+function drawFx(ctx, base, x, y, o = {}) {
+  const size = o.size || 40;
+  ctx.save();
+  ctx.translate(x, y);
+  if (o.angle) ctx.rotate(o.angle);
+  if (o.additive) ctx.globalCompositeOperation = 'lighter';
+  if (o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
+  const sheet = Assets.img(base + '_sheet');
+  if (sheet) {
+    const N = Math.max(1, Math.round(sheet.width / sheet.height));
+    const fw = sheet.width / N;
+    const fps = o.fps || 10;
+    const f = o.loop ? Math.floor((o.t || 0) * fps) % N
+                     : Math.min(N - 1, Math.floor((o.t || 0) * fps));
+    ctx.drawImage(sheet, f * fw, 0, fw, sheet.height, -size / 2, -size / 2, size, size);
+    ctx.restore();
+    return true;
+  }
+  const st = Assets.img(base);
+  if (!st) { ctx.restore(); return false; }
+  ctx.drawImage(st, -size / 2, -size / 2, size, size);
   ctx.restore();
   return true;
 }
