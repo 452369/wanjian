@@ -204,8 +204,8 @@ const Skills = {
     for (const w of game.waves.list) {
       // fx_slash 雪碧图动画优先（无 sheet 回退静态图/程序化月牙）
       if (drawFx(ctx, 'fx_slash', w.x, w.y, {
-        size: w.r * 4.4, angle: w.dir + Math.PI / 4,
-        additive: true, alpha: clamp(w.life / 0.35, 0, 1) * 0.95,
+        size: w.r * 4.6, angle: w.dir + Math.PI / 4,
+        alpha: clamp(w.life / 0.35, 0, 1) * 0.95,
         t: 1.1 - w.life, fps: 12,
       })) continue;
       ctx.save();
