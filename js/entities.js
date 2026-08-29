@@ -183,24 +183,24 @@ function spawnSwordInit(s, x, y, a, game) {
   s.life = CFG.sword.life;
   s.color = crit ? '#ffd75a' : game.player.tier.color;
   s.tier = game.player.tierIndex;
-  s.pierce = CFG.sword.pierce; // 光束穿透
   s.trail.length = 0;
   s.hits.length = 0;
 }
 
 function drawSword(ctx, s) {
-  // 青色光束拖尾（additive 长条，参考视频的穿透光束观感）
   if (s.trail.length > 1) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = 'rgba(84,232,255,0.4)';
-    ctx.lineWidth = 5; ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(s.trail[0].x, s.trail[0].y);
-    for (const p of s.trail) ctx.lineTo(p.x, p.y);
-    ctx.lineTo(s.x, s.y);
-    ctx.stroke();
-    ctx.restore();
+    ctx.strokeStyle = s.color;
+    ctx.lineCap = 'round';
+    for (let i = 1; i < s.trail.length; i++) {
+      const a = i / s.trail.length;
+      ctx.globalAlpha = a * 0.35;
+      ctx.lineWidth = 5 * a;
+      ctx.beginPath();
+      ctx.moveTo(s.trail[i - 1].x, s.trail[i - 1].y);
+      ctx.lineTo(s.trail[i].x, s.trail[i].y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   }
   const a = Math.atan2(s.vy, s.vx);
   // AI 贴图优先：带透明通道的发光贴图（亮度键控抠底），按速度方向旋转

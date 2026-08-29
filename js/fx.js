@@ -39,14 +39,14 @@ const FX = {
       });
     }
   },
-  // 伤害数字（参考视频：红色数字）
+  // 伤害数字
   num(x, y, val, crit) {
     if (!CFG.feel.dmgNum) return;
     this.nums.spawn(n => {
       n.x = x + rand(-8, 8); n.y = y; n.vy = -90;
       n.life = n.max = crit ? 0.8 : 0.55;
       n.val = String(val); n.size = crit ? 26 : 15;
-      n.color = '#ff5a5a';
+      n.color = crit ? '#ff5a5a' : '#ffffff';
     });
   },
   // 普通飘字（拾取/晋升提示）

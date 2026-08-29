@@ -35,19 +35,14 @@ class Ground {
         if (tileImg) {
           ctx.drawImage(tileImg, sx, sy, T, T);
         } else {
-          // 草地（参考视频浅绿草原）：浅绿底 + 深浅斑块 + 小洞
           const hs = hash2(gx, gy);
-          ctx.fillStyle = hs > 0.5 ? '#93a25c' : '#8b9a56';
+          ctx.fillStyle = hs > 0.5 ? '#161d33' : '#131929';
           ctx.fillRect(sx, sy, T, T);
-          if (hs > 0.62) {
-            ctx.fillStyle = 'rgba(90,110,55,0.35)';
-            ctx.beginPath();
-            ctx.ellipse(sx + T * (0.25 + hs * 0.4), sy + T * (0.3 + hs * 0.3), T * 0.3, T * 0.2, hs * 3, 0, TAU);
-            ctx.fill();
-          }
-          if (hs < 0.12) {
-            ctx.fillStyle = 'rgba(40,48,30,0.55)';
-            ctx.beginPath(); ctx.arc(sx + T * 0.5, sy + T * 0.5, T * 0.12, 0, TAU); ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+          ctx.strokeRect(sx + 0.5, sy + 0.5, T - 1, T - 1);
+          if (hs > 0.8) { // 苔藓斑
+            ctx.fillStyle = 'rgba(70,120,90,0.25)';
+            ctx.beginPath(); ctx.arc(sx + T * (0.2 + hs * 0.5), sy + T * 0.7, 7, 0, TAU); ctx.fill();
           }
         }
       }
@@ -93,42 +88,42 @@ class Ground {
     ctx.restore();
   }
 
-  // 无贴图时的程序化装饰兜底（草地主题：岩石/水晶/枯枝/草丛）
+  // 无贴图时的程序化装饰兜底
   decoProcedural(ctx, kind, x, y, hs) {
     switch (kind) {
-      case 0: // 大岩石
-        ctx.fillStyle = '#4a5045';
-        ctx.beginPath(); ctx.ellipse(x, y, 22, 14, hs * 3, 0, TAU); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.beginPath(); ctx.ellipse(x - 5, y - 5, 10, 6, hs * 3, 0, TAU); ctx.fill();
+      case 0: // 石灯笼
+        ctx.fillStyle = '#3a4258'; ctx.fillRect(x - 10, y - 16, 20, 26);
+        ctx.fillStyle = '#2a3044'; ctx.fillRect(x - 14, y + 8, 28, 6);
+        ctx.fillStyle = '#ffd75a'; ctx.globalAlpha = 0.8;
+        ctx.beginPath(); ctx.arc(x, y - 4, 4, 0, TAU); ctx.fill();
+        ctx.globalAlpha = 1;
         break;
-      case 1: // 碎石
-        ctx.fillStyle = '#565e50';
-        ctx.beginPath(); ctx.ellipse(x, y, 9, 6, hs * 2, 0, TAU); ctx.fill();
-        break;
-      case 2: // 水晶簇
-        ctx.fillStyle = '#7ab8e8';
-        ctx.beginPath();
-        ctx.moveTo(x - 8, y + 4); ctx.lineTo(x - 3, y - 12); ctx.lineTo(x + 1, y + 4);
-        ctx.closePath(); ctx.fill();
-        ctx.beginPath();
-        ctx.moveTo(x + 0, y + 4); ctx.lineTo(x + 6, y - 8); ctx.lineTo(x + 10, y + 4);
-        ctx.closePath(); ctx.fill();
-        break;
-      case 3: // 枯枝
-        ctx.strokeStyle = '#5a5240'; ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.moveTo(x - 10, y + 8); ctx.lineTo(x + 8, y - 8); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x - 2, y - 1); ctx.lineTo(x + 6, y + 6); ctx.stroke();
-        break;
-      default: // 草丛
-        ctx.strokeStyle = '#6a7c3e'; ctx.lineWidth = 2;
-        for (const o of [-5, 0, 5]) {
-          ctx.beginPath(); ctx.moveTo(x + o, y + 6); ctx.lineTo(x + o * 1.3, y - 7); ctx.stroke();
+      case 1: // 竹丛
+        ctx.strokeStyle = '#3e7a52'; ctx.lineWidth = 3;
+        for (const o of [-6, 0, 7]) {
+          ctx.beginPath(); ctx.moveTo(x + o, y + 14); ctx.lineTo(x + o * 1.4, y - 18); ctx.stroke();
         }
+        ctx.fillStyle = '#4e8a5e';
+        ctx.beginPath(); ctx.ellipse(x, y - 20, 12, 5, 0.3, 0, TAU); ctx.fill();
+        break;
+      case 2: // 石碑
+        ctx.fillStyle = '#39415a'; ctx.fillRect(x - 9, y - 22, 18, 34);
+        ctx.fillStyle = '#2c3247'; ctx.fillRect(x - 13, y + 10, 26, 6);
+        break;
+      case 3: // 香炉
+        ctx.fillStyle = '#4a4436';
+        ctx.beginPath(); ctx.ellipse(x, y, 12, 8, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = 'rgba(150,190,200,0.35)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.quadraticCurveTo(x + 5, y - 18, x, y - 30); ctx.stroke();
+        break;
+      default: // 酒坛
+        ctx.fillStyle = '#5a4632';
+        ctx.beginPath(); ctx.ellipse(x, y, 10, 13, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#8a3a3a'; ctx.fillRect(x - 5, y - 17, 10, 6);
         break;
     }
-    if (hs < 0.06) {
-      ctx.fillStyle = 'rgba(110,125,90,0.5)';
+    if (hs < 0.06) { // 碎石
+      ctx.fillStyle = 'rgba(120,140,170,0.3)';
       ctx.beginPath(); ctx.ellipse(x + 26, y + 18, 6, 4, hs * 6, 0, TAU); ctx.fill();
     }
   }
@@ -153,7 +148,7 @@ class Game {
   reset() {
     this.player = new Player();
     Skills.recompute(this.player);
-    this.swords = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, dmg: 0, crit: false, pierce: 0, life: 0, color: '', tier: 0, trail: [], hits: [] })));
+    this.swords = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, dmg: 0, crit: false, life: 0, color: '', tier: 0, trail: [], hits: [] })));
     this.waves = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, dir: 0, r: 24, dmg: 0, life: 0, color: '', hits: [] })));
     this.bolts = new EntityList(new Pool(() => ({ x: 0, y: 0, r: 40, w: 12, color: '#c07aff', t: 0, max: 0.28 })));
     this.monsters = new EntityList(new Pool(() => new Monster()));
@@ -429,11 +424,11 @@ class Game {
       this.cam.y = clamp(this.player.y, CFG.view.h / 2, Math.max(CFG.view.h / 2, CFG.arena.h - CFG.view.h / 2));
       this.spawner.update(dt);
       this.player.update(dt, this);
-      // 飞剑（光束）：拖尾拉长
+      // 飞剑
       for (const s of this.swords.list) {
         s.x += s.vx * dt; s.y += s.vy * dt;
         s.trail.push({ x: s.x, y: s.y });
-        if (s.trail.length > 20) s.trail.shift();
+        if (s.trail.length > 9) s.trail.shift();
         s.life -= dt;
         if (s.life <= 0 || dist2(s.x, s.y, this.player.x, this.player.y) > 1100 * 1100) s.dead = true;
       }
@@ -503,17 +498,15 @@ class Game {
 
   collide() {
     const P = this.player;
-    // 飞剑光束 × 妖兽（穿透 + 击退）
+    // 飞剑 × 妖兽
     for (const s of this.swords.list) {
       if (s.dead) continue;
       for (const m of this.monsters.list) {
         if (m.dead || s.hits.includes(m.id)) continue;
         if (hitCircle(s.x, s.y, 12, m.x, m.y, m.r)) {
           m.hit(s.dmg, s.crit, this, s.x, s.y);
-          const kd = Math.hypot(s.vx, s.vy) || 1;
-          m.x += (s.vx / kd) * 14; m.y += (s.vy / kd) * 14; // 光束击退
-          if (s.pierce > 0) { s.pierce--; s.hits.push(m.id); }
-          else { s.dead = true; break; }
+          s.dead = true;
+          break;
         }
       }
     }
