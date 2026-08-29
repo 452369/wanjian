@@ -241,6 +241,7 @@ class Monster {
     this.slamCd = rand(2.5, 3.5);  // 妖将震地冷却
     this.slamT = 0;
     this.tell = false;             // 符鬼施法预警
+    this.kvx = 0; this.kvy = 0;    // 击退滑行速度（吸血鬼式：受击弹开+滑行减速）
     this.boss = type === 'boss';
     this.elite = type === 'elite';
     if (this.boss) {
@@ -258,6 +259,13 @@ class Monster {
   update(dt, game) {
     this.t += dt;
     if (this.flash > 0) this.flash -= dt;
+    // 击退滑行：快速衰减（吸血鬼式受击弹开）
+    if (this.kvx || this.kvy) {
+      this.x += this.kvx * dt; this.y += this.kvy * dt;
+      const kdec = Math.exp(-9 * dt);
+      this.kvx *= kdec; this.kvy *= kdec;
+      if (Math.abs(this.kvx) < 4 && Math.abs(this.kvy) < 4) { this.kvx = 0; this.kvy = 0; }
+    }
     const p = game.player;
     const dx = p.x - this.x, dy = p.y - this.y;
     const dist = Math.hypot(dx, dy) || 1;
@@ -394,6 +402,13 @@ class Monster {
       this.x += this.dvx * dt; this.y += this.dvy * dt;
       if (this.dashT <= 0) { this.dashState = 0; this.dashCd = this.cfg.dashGap; }
     }
+  }
+
+  // 击退：Boss 基本免疫，精英减半（force=初速度 px/s，滑行约0.3秒）
+  knock(nx, ny, force) {
+    const f = this.boss ? force * 0.12 : this.elite ? force * 0.35 : force;
+    this.kvx += nx * f;
+    this.kvy += ny * f;
   }
 
   hit(dmg, crit, game, hx, hy, silent) {

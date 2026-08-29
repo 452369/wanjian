@@ -124,17 +124,17 @@ const Skills = {
         p.orbPos.push({ x: p.x + Math.cos(a) * R, y: p.y + Math.sin(a) * R });
       }
       const dmg = (16 + 12 * s.huanrao) * e.dmgMul;
-      const kb = 26 + 10 * s.huanrao; // 巨剑击退
+      const kb = 300 + 80 * s.huanrao; // 巨剑击退（初速度，滑行约0.3秒）
       for (const m of game.monsters.list) {
         if (m.dead) continue;
         m.orbCd = (m.orbCd || 0) - dt;
         if (m.orbCd > 0) continue;
         for (const o of p.orbPos) {
-          if (hitCircle(o.x, o.y, 18, m.x, m.y, m.r)) {
+          if (hitCircle(o.x, o.y, 22, m.x, m.y, m.r)) {
             m.hit(dmg, false, game, o.x, o.y);
             const kdx = m.x - p.x, kdy = m.y - p.y;
             const kd = Math.hypot(kdx, kdy) || 1;
-            m.x += (kdx / kd) * kb; m.y += (kdy / kd) * kb; // 击退
+            m.knock(kdx / kd, kdy / kd, kb);
             m.orbCd = 0.45;
             break;
           }
@@ -172,10 +172,10 @@ const Skills = {
       for (const o of p.orbPos) {
         const a = Math.atan2(o.y - p.y, o.x - p.x);
         ctx.globalAlpha = 0.3;
-        const osz = 40 + (p.skills.huanrao || 0) * 8; // 巨剑随等级变大
+        const osz = 56 + (p.skills.huanrao || 0) * 12; // 巨剑光晕随等级变大
         ctx.drawImage(glowSprite(p.tier.color), o.x - osz / 2, o.y - osz / 2, osz, osz);
         ctx.globalAlpha = 1;
-        if (drawSprite(ctx, 'sword_tier' + p.tierIndex, o.x, o.y, { size: 44 + (p.skills.huanrao || 0) * 7, angle: a + Math.PI / 2 })) continue;
+        if (drawSprite(ctx, 'sword_tier' + p.tierIndex, o.x, o.y, { size: 60 + (p.skills.huanrao || 0) * 10, angle: a + Math.PI / 2 })) continue;
         ctx.save();
         ctx.translate(o.x, o.y); ctx.rotate(a + Math.PI / 2);
         drawBlade(ctx, 0, 0, 30, p.tier.color);

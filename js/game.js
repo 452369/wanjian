@@ -498,25 +498,29 @@ class Game {
 
   collide() {
     const P = this.player;
-    // 飞剑 × 妖兽
+    // 飞剑 × 妖兽（吸血鬼式击退）
     for (const s of this.swords.list) {
       if (s.dead) continue;
       for (const m of this.monsters.list) {
         if (m.dead || s.hits.includes(m.id)) continue;
         if (hitCircle(s.x, s.y, 12, m.x, m.y, m.r)) {
           m.hit(s.dmg, s.crit, this, s.x, s.y);
+          const kd = Math.hypot(s.vx, s.vy) || 1;
+          m.knock(s.vx / kd, s.vy / kd, 240);
           s.dead = true;
           break;
         }
       }
     }
-    // 剑气波 × 妖兽（穿透）
+    // 剑气波 × 妖兽（穿透 + 击退）
     for (const w of this.waves.list) {
       if (w.dead) continue;
       for (const m of this.monsters.list) {
         if (m.dead || w.hits.includes(m.id)) continue;
         if (hitCircle(w.x, w.y, w.r, m.x, m.y, m.r)) {
           m.hit(w.dmg, false, this, w.x, w.y);
+          const kd = Math.hypot(w.vx, w.vy) || 1;
+          m.knock(w.vx / kd, w.vy / kd, 200);
           w.hits.push(m.id);
         }
       }
