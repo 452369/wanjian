@@ -242,6 +242,7 @@ class Monster {
     this.slamT = 0;
     this.tell = false;             // 符鬼施法预警
     this.kvx = 0; this.kvy = 0;    // 击退滑行速度（吸血鬼式：受击弹开+滑行减速）
+    this.airT = 0;                 // 被巨剑击飞的腾空时间
     this.boss = type === 'boss';
     this.elite = type === 'elite';
     if (this.boss) {
@@ -260,9 +261,10 @@ class Monster {
     this.t += dt;
     if (this.flash > 0) this.flash -= dt;
     // 击退滑行：快速衰减（吸血鬼式受击弹开）
+    if (this.airT > 0) this.airT -= dt;
     if (this.kvx || this.kvy) {
       this.x += this.kvx * dt; this.y += this.kvy * dt;
-      const kdec = Math.exp(-9 * dt);
+      const kdec = Math.exp((this.airT > 0 ? -4.5 : -9) * dt); // 击飞时滑得更远
       this.kvx *= kdec; this.kvy *= kdec;
       if (Math.abs(this.kvx) < 4 && Math.abs(this.kvy) < 4) { this.kvx = 0; this.kvy = 0; }
     }
@@ -443,6 +445,13 @@ class Monster {
 
   draw(ctx, game) {
     const fl = this.flash > 0;
+    // 被巨剑击飞：腾空弧线 + 空中翻滚
+    const lift = this.airT > 0 ? Math.sin((1 - this.airT / 0.45) * Math.PI) * 30 : 0;
+    ctx.save();
+    if (lift > 0) {
+      ctx.translate(0, -lift);
+      ctx.rotate((1 - this.airT / 0.45) * TAU * (this.strafe || 1));
+    }
     switch (this.type) {
       case 'wolf': this.drawWolf(ctx, game, fl); break;
       case 'bat': this.drawBat(ctx, fl); break;
@@ -450,6 +459,7 @@ class Monster {
       case 'elite': this.drawElite(ctx, game, fl); break;
       case 'boss': this.drawBoss(ctx, fl); break;
     }
+    ctx.restore();
   }
 
   drawWolf(ctx, game, fl) {

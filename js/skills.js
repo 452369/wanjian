@@ -124,7 +124,7 @@ const Skills = {
         p.orbPos.push({ x: p.x + Math.cos(a) * R, y: p.y + Math.sin(a) * R });
       }
       const dmg = (16 + 12 * s.huanrao) * e.dmgMul;
-      const kb = 300 + 80 * s.huanrao; // 巨剑击退（初速度，滑行约0.3秒）
+      const kb = 600 + 140 * s.huanrao; // 巨剑击飞：小怪直接被抡飞数米
       for (const m of game.monsters.list) {
         if (m.dead) continue;
         m.orbCd = (m.orbCd || 0) - dt;
@@ -135,6 +135,7 @@ const Skills = {
             const kdx = m.x - p.x, kdy = m.y - p.y;
             const kd = Math.hypot(kdx, kdy) || 1;
             m.knock(kdx / kd, kdy / kd, kb);
+            if (!m.elite && !m.boss) m.airT = 0.45; // 小怪击飞腾空翻滚
             m.orbCd = 0.45;
             break;
           }
