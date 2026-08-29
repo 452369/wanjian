@@ -9,25 +9,25 @@ const CFG = {
 
   player: {
     hp: 100, radius: 16,
-    speed: 240,        // 基础移速 px/s（360° 走位）
+    speed: 300,        // 基础移速：节奏放缓后靠走位周旋（比怪快一大截）
     invulnTime: 0.7,   // 受击无敌帧
   },
 
-  // 御剑术（初始主动）基础参数：开局双剑、高伤高频，前期碾压感
-  sword: { damage: 15, cooldown: 0.45, speed: 640, life: 1.5, radius: 10 },
+  // 御剑术（初始主动）基础参数：伤害削弱——怪不再被秒，靠持续输出磨
+  sword: { damage: 9, cooldown: 0.5, speed: 640, life: 1.5, radius: 10 },
   crit: { rate: 0.05, mult: 1.8 },
 
-  // 升级改为"击杀直接涨级"：升到下一级所需击杀数 = base + (level-1) * per
-  levelup: { base: 4, per: 2 },
+  // 升级（击杀直接涨级）刻意放缓：升到下一级所需击杀数 = base + (level-1) * per
+  levelup: { base: 12, per: 3 },
 
-  // 剑品特效档位：随角色等级晋升（飞剑贴图/颜色随之切换）
+  // 剑品特效档位：随角色等级晋升（升级已放缓，档位相应下移）
   swordTiers: [
     { lv: 1,  name: '凡剑', color: '#cfe8ff' },
-    { lv: 5,  name: '灵剑', color: '#54e8c0' },
-    { lv: 10, name: '法剑', color: '#5aa0ff' },
-    { lv: 15, name: '宝剑', color: '#c07aff' },
-    { lv: 20, name: '仙剑', color: '#ffd75a' },
-    { lv: 26, name: '剑意', color: '#ff5a8a' },
+    { lv: 4,  name: '灵剑', color: '#54e8c0' },
+    { lv: 7,  name: '法剑', color: '#5aa0ff' },
+    { lv: 10, name: '宝剑', color: '#c07aff' },
+    { lv: 14, name: '仙剑', color: '#ffd75a' },
+    { lv: 18, name: '剑意', color: '#ff5a8a' },
   ],
 
   // ===== 技能池 =====
@@ -52,33 +52,30 @@ const CFG = {
   },
 
   monsters: {
-    // 模型加大 + 伤害削弱：怪海围城但咬不动主角，前期碾压爽感
-    wolf:  { name: '狼妖', hp: 24, speed: 120, radius: 20, dmg: 8,  xp: 3 },
-    bat:   { name: '蝠妖', hp: 16, speed: 100, radius: 16, dmg: 6,  xp: 3, sineAmp: 60, sineFreq: 3 },
-    ghost: { name: '符鬼', hp: 36, speed: 80,  radius: 18, dmg: 6,  xp: 5,
-             keepDist: 300, shootGap: 2.4, bulletSpeed: 220, bulletDmg: 8 },
-    elite: { name: '妖将', hp: 400, speed: 85, radius: 34, dmg: 18, xp: 0, gold: 15 },
-    boss:  { name: '黑山老妖', hp: 5200, speed: 70, radius: 52, dmg: 25,
-             radialCount: 14, radialGap: 3.0, bulletSpeed: 200,
-             dashGap: 4.5, dashSpeed: 500, phase2At: 0.5, xp: 0, gold: 60 },
+    // 慢速大群：移动/攻速/伤害全面下调，数量与血量上调——围而不攻，靠走位周旋
+    wolf:  { name: '狼妖', hp: 40, speed: 95,  radius: 20, dmg: 6,  xp: 3 },
+    bat:   { name: '蝠妖', hp: 28, speed: 85,  radius: 16, dmg: 5,  xp: 3, sineAmp: 60, sineFreq: 3 },
+    ghost: { name: '符鬼', hp: 60, speed: 65,  radius: 18, dmg: 6,  xp: 5,
+             keepDist: 320, shootGap: 3.2, bulletSpeed: 200, bulletDmg: 6 },
+    elite: { name: '妖将', hp: 600, speed: 70, radius: 34, dmg: 14, xp: 0, gold: 15 },
+    boss:  { name: '黑山老妖', hp: 6500, speed: 55, radius: 52, dmg: 20,
+             radialCount: 14, radialGap: 4.0, bulletSpeed: 180,
+             dashGap: 5.5, dashSpeed: 420, phase2At: 0.5, xp: 0, gold: 60 },
   },
 
   bullets: { radius: 7, life: 6 },
 
-  // ===== Survivor 刷怪导演：怪海围城 =====
+  // ===== Survivor 刷怪导演：连续加速爬坡（无波次跳变，随时间平滑变多变硬）=====
   spawn: {
-    baseGap: 0.35,    // 初始刷怪间隔（秒）：生成量 > 击杀量才有围城感
-    minGap: 0.1,
-    rampEvery: 30,    // 每 30 秒一档难度
-    hpRamp: 1.22,     // 每档怪物血量 ×1.22
-    spdRamp: 0.03,    // 每档怪物速度 +3%
-    gapShrink: 0.92,  // 每档刷怪间隔 ×0.92
-    maxAlive: 110,    // 同屏上限：围城感（对象池撑得住）
-    packMin: 3,       // 每次刷怪成群：数量随难度档增加
-    packMax: 6,
-    elites: [45, 90, 135], // 精英出现时点
-    bossAt: 150,      // Boss 登场（2:30），斩杀即胜利
-    ringPad: 60,      // 刷怪环贴近视野边缘，怪涌进来的压迫感
+    baseGap: 0.9,     // 初始刷怪间隔（秒）：慢热开局
+    minGap: 0.18,     // 间隔下限
+    gapPerSec: 0.97,  // 每秒间隔 ×0.97（连续加速，30秒≈×0.4）
+    hpPerSec: 1.0066, // 每秒血量 ×1.0066（1分钟≈×1.48，持续变硬）
+    maxAlive: 140,    // 同屏上限：围城感
+    packAfter: 50,    // 50 秒后开始成群（每 50 秒 +1 只/组，上限 4）
+    elites: [70, 120], // 精英出现时点（节奏放缓后移）
+    bossAt: 180,      // Boss 登场（3:00），斩杀即胜利
+    ringPad: 60,      // 刷怪环贴近视野边缘
   },
 
   // 灵气结界：有限竞技场，边界用发光特效线封闭

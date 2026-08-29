@@ -290,7 +290,7 @@ class Monster {
           if (this.slamT <= 0) {
             FX.ring(this.x, this.y, '#ff4a6a', 22, 320);
             Cam.shake(5);
-            if (dist < 120) p.hurt(18, game);
+            if (dist < 120) p.hurt(14, game);
             AudioSys.boom();
           }
           break;

@@ -78,7 +78,7 @@ const Skills = {
       const base = m ? Math.atan2(m.y - p.y, m.x - p.x) : Math.atan2(p.face.y, p.face.x);
       for (let i = 0; i < count; i++) {
         game.spawnWave(p.x, p.y, base + (i - (count - 1) / 2) * 0.3, {
-          speed: 470, dmg: (14 + 8 * lv) * e.dmgMul, r: 26 * e.areaMul, color: p.tier.color,
+          speed: 470, dmg: (10 + 6 * lv) * e.dmgMul, r: 26 * e.areaMul, color: p.tier.color,
         });
       }
       AudioSys.shoot();
@@ -93,7 +93,7 @@ const Skills = {
       const cand = game.monsters.list.filter(m => !m.dead && dist2(m.x, m.y, p.x, p.y) < 480 * 480 * e.areaMul);
       for (let i = cand.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [cand[i], cand[j]] = [cand[j], cand[i]]; }
       for (let i = 0; i < Math.min(strikes, cand.length); i++) {
-        game.strike(cand[i].x, cand[i].y, 62 * e.areaMul, (26 + 14 * lv) * e.dmgMul, '#c07aff');
+        game.strike(cand[i].x, cand[i].y, 62 * e.areaMul, (18 + 10 * lv) * e.dmgMul, '#c07aff');
       }
     }
 
@@ -102,35 +102,39 @@ const Skills = {
     if ((s.wanjian || 0) > 0 && p.cdWanjian <= 0) {
       const lv = s.wanjian;
       p.cdWanjian = (11 - 0.9 * lv) * e.cdMul;
-      const strikes = 5 + 3 * lv;
+      const strikes = 4 + 2 * lv;
       const R = 300 * e.areaMul;
       FX.flash(0.18, p.tier.color);
       for (let i = 0; i < strikes; i++) {
         const a = rand(0, TAU), d = rand(40, R);
-        game.strike(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 55 * e.areaMul, (22 + 10 * lv) * e.dmgMul, p.tier.color);
+        game.strike(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 55 * e.areaMul, (16 + 8 * lv) * e.dmgMul, p.tier.color);
       }
       Cam.shake(6, 0.3);
       AudioSys.boom();
     }
 
-    // 环绕飞剑：护主剑阵，绕体旋转，接触伤害（每怪独立冷却）
+    // 环绕飞剑：护主巨剑，绕体旋转，接触伤害+击退（每怪独立冷却）
     if ((s.huanrao || 0) > 0) {
       p.orbitA = (p.orbitA || 0) + dt * 3.2;
       const count = s.huanrao + 2 + Math.floor(e.projBonus / 2);
-      const R = (70 + 8 * s.huanrao) * e.areaMul;
+      const R = (80 + 14 * s.huanrao) * e.areaMul;
       p.orbPos = [];
       for (let i = 0; i < count; i++) {
         const a = p.orbitA + (i / count) * TAU;
         p.orbPos.push({ x: p.x + Math.cos(a) * R, y: p.y + Math.sin(a) * R });
       }
-      const dmg = (12 + 8 * s.huanrao) * e.dmgMul;
+      const dmg = (16 + 12 * s.huanrao) * e.dmgMul;
+      const kb = 26 + 10 * s.huanrao; // 巨剑击退
       for (const m of game.monsters.list) {
         if (m.dead) continue;
         m.orbCd = (m.orbCd || 0) - dt;
         if (m.orbCd > 0) continue;
         for (const o of p.orbPos) {
-          if (hitCircle(o.x, o.y, 16, m.x, m.y, m.r)) {
+          if (hitCircle(o.x, o.y, 18, m.x, m.y, m.r)) {
             m.hit(dmg, false, game, o.x, o.y);
+            const kdx = m.x - p.x, kdy = m.y - p.y;
+            const kd = Math.hypot(kdx, kdy) || 1;
+            m.x += (kdx / kd) * kb; m.y += (kdy / kd) * kb; // 击退
             m.orbCd = 0.45;
             break;
           }
@@ -144,7 +148,7 @@ const Skills = {
       p.auraTick = (p.auraTick || 0) - dt;
       if (p.auraTick <= 0) {
         p.auraTick = 0.5;
-        game.areaDamage(p.x, p.y, p.auraR, (7 + 5 * s.jianyu) * e.dmgMul, { silent: true, color: p.tier.color });
+        game.areaDamage(p.x, p.y, p.auraR, (6 + 4 * s.jianyu) * e.dmgMul, { silent: true, color: p.tier.color });
       }
     } else p.auraR = 0;
 
@@ -168,9 +172,10 @@ const Skills = {
       for (const o of p.orbPos) {
         const a = Math.atan2(o.y - p.y, o.x - p.x);
         ctx.globalAlpha = 0.3;
-        ctx.drawImage(glowSprite(p.tier.color), o.x - 20, o.y - 20, 40, 40);
+        const osz = 40 + (p.skills.huanrao || 0) * 8; // 巨剑随等级变大
+        ctx.drawImage(glowSprite(p.tier.color), o.x - osz / 2, o.y - osz / 2, osz, osz);
         ctx.globalAlpha = 1;
-        if (drawSprite(ctx, 'sword_tier' + p.tierIndex, o.x, o.y, { size: 48, angle: a + Math.PI / 2 })) continue;
+        if (drawSprite(ctx, 'sword_tier' + p.tierIndex, o.x, o.y, { size: 44 + (p.skills.huanrao || 0) * 7, angle: a + Math.PI / 2 })) continue;
         ctx.save();
         ctx.translate(o.x, o.y); ctx.rotate(a + Math.PI / 2);
         drawBlade(ctx, 0, 0, 30, p.tier.color);

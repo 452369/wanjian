@@ -1,18 +1,16 @@
 'use strict';
-// ===== 出怪导演：视野外环形刷怪 + 难度爬坡 + 精英/Boss 时间轴 =====
+// ===== 出怪导演：连续加速爬坡（随时间平滑变多变硬，无波次跳变）=====
 class Spawner {
   constructor(game) {
     this.g = game;
     this.time = 0;
-    this.cd = 0.6;
+    this.cd = 1.2;
     this.eliteIdx = 0;
     this.bossSpawned = false;
     this.done = false;
   }
 
-  rampIdx() { return Math.floor(this.time / CFG.spawn.rampEvery); }
-  hpMul() { return Math.pow(CFG.spawn.hpRamp, this.rampIdx()); }
-  spdMul() { return 1 + CFG.spawn.spdRamp * this.rampIdx(); }
+  hpMul() { return Math.pow(CFG.spawn.hpPerSec, this.time); } // 连续变硬
 
   update(dt) {
     if (this.done) return; // Boss 登场后停止常规刷怪，专心对决
@@ -22,7 +20,7 @@ class Spawner {
     // 定点精英
     while (this.eliteIdx < S.elites.length && this.time >= S.elites[this.eliteIdx]) {
       this.eliteIdx++;
-      this.g.spawnMonster('elite', { hpMul: this.hpMul(), spdMul: this.spdMul() });
+      this.g.spawnMonster('elite', { hpMul: this.hpMul() });
       FX.showBanner('妖将现世', '斩之必有所获');
       AudioSys.boom();
     }
@@ -38,23 +36,23 @@ class Spawner {
       return;
     }
 
-    // 常规刷怪：成群结队从同一方向压过来（围城感）
-    const idx = this.rampIdx();
+    // 常规刷怪：间隔随时间连续收缩（加速度感），50 秒后逐渐成群
     this.cd -= dt;
     if (this.cd <= 0 && this.g.monsters.list.length < S.maxAlive) {
-      this.cd = Math.max(S.minGap, S.baseGap * Math.pow(S.gapShrink, idx)) * rand(0.7, 1.3);
+      this.cd = Math.max(S.minGap, S.baseGap * Math.pow(S.gapPerSec, this.time)) * rand(0.75, 1.25);
       const pool = ['wolf'];
-      if (this.time > 25) pool.push('bat');
-      if (this.time > 60) pool.push('bat', 'ghost');
-      if (this.time > 100) pool.push('ghost');
+      if (this.time > 35) pool.push('bat');
+      if (this.time > 70) pool.push('bat', 'ghost');
+      if (this.time > 110) pool.push('ghost');
       const type = choice(pool);
-      const packN = Math.max(1, Math.min(S.packMax, S.packMin + Math.floor(idx / 1.2),
-                                        S.maxAlive - this.g.monsters.list.length));
+      const packN = this.time >= S.packAfter
+        ? Math.min(4, 2 + Math.floor((this.time - S.packAfter) / 50))
+        : 1;
       const angle = rand(0, TAU); // 一群从同一方向压来
       for (let k = 0; k < packN; k++) {
         this.g.spawnMonster(type, {
-          hpMul: this.hpMul(), spdMul: this.spdMul(),
-          angle: angle + rand(-0.35, 0.35), distJitter: rand(0, 110),
+          hpMul: this.hpMul(),
+          angle: angle + rand(-0.3, 0.3), distJitter: rand(0, 100),
         });
       }
     }

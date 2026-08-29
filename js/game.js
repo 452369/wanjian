@@ -166,6 +166,7 @@ class Game {
     this.doubled = false;
     this.winTimer = 0;
     this.lastGold = 0;
+    this.lastTier = this.player.tier.name; // 修正：避免开局误弹"凡剑晋升"
     this.toastMsg = ''; this.toastT = 0;
     FX.clear();
     Cam.reset();
