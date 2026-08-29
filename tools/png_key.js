@@ -117,10 +117,31 @@ function keyMagenta(img, clearTh = 90, softTh = 30) {
   return { cleared, soft };
 }
 
+// ---------- 绿幕抠图 ----------
+// 绿幕背景生成（角色含黑色/白色时用绿幕最稳）
+function keyGreen(img, clearTh = 60, softTh = 25) {
+  const { w, h, rgba } = img;
+  let cleared = 0, soft = 0;
+  for (let i = 0; i < w * h; i++) {
+    const di = i * 4;
+    let r = rgba[di], g = rgba[di + 1], b = rgba[di + 2];
+    const m = g - Math.max(r, b); // 绿度：纯绿=255，白/黑/红/紫 ≤ 0
+    if (m > clearTh) { rgba[di + 3] = 0; cleared++; }
+    else if (m > softTh) {
+      const t = (m - softTh) / (clearTh - softTh);
+      rgba[di + 3] = Math.round(rgba[di + 3] * (1 - t));
+      g = Math.max(Math.max(r, b), g - (m - softTh)); // 去绿镶边
+      rgba[di + 1] = g;
+      soft++;
+    }
+  }
+  return { cleared, soft };
+}
+
 // ---------- 主流程 ----------
 function main() {
   const [,, src, dst, mode, clearTh, softTh] = process.argv;
-  if (!src || !dst) { console.log('用法: node tools/png_key.js <输入.png> <输出.png> key|copy [清除阈值] [柔边阈值]'); process.exit(1); }
+  if (!src || !dst) { console.log('用法: node tools/png_key.js <输入.png> <输出.png> key|keyg|copy [清除阈值] [柔边阈值]'); process.exit(1); }
   const img = decode(fs.readFileSync(src));
   let transparent = 0;
   for (let i = 0; i < img.w * img.h; i++) if (img.rgba[i * 4 + 3] < 128) transparent++;
@@ -128,6 +149,9 @@ function main() {
   if (mode === 'key') {
     const { cleared, soft } = keyMagenta(img, clearTh ? +clearTh : 90, softTh ? +softTh : 30);
     console.log(`抠图完成：清除 ${cleared} 像素，柔边 ${soft} 像素`);
+  } else if (mode === 'keyg') {
+    const { cleared, soft } = keyGreen(img, clearTh ? +clearTh : 60, softTh ? +softTh : 25);
+    console.log(`绿幕抠图完成：清除 ${cleared} 像素，柔边 ${soft} 像素`);
   }
   fs.writeFileSync(dst, encode(img.w, img.h, img.rgba));
   console.log('已写出', dst);
