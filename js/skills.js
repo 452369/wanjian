@@ -105,6 +105,7 @@ const Skills = {
       const strikes = 4 + 2 * lv;
       const R = 300 * e.areaMul;
       FX.flash(0.18, p.tier.color);
+      game.spawnNova(p.x, p.y, 300); // 新星爆发贴图
       for (let i = 0; i < strikes; i++) {
         const a = rand(0, TAU), d = rand(40, R);
         game.strike(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 55 * e.areaMul, (16 + 8 * lv) * e.dmgMul, p.tier.color);
@@ -168,6 +169,17 @@ const Skills = {
       ctx.strokeStyle = p.tier.color; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.auraR, 0, TAU); ctx.stroke();
       ctx.globalAlpha = 1;
+      const tor = Assets.img('fx_tornado'); // 剑气龙卷贴图
+      if (tor) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.5;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(game.time * 1.5);
+        const ts = p.auraR * 2.4;
+        ctx.drawImage(tor, -ts / 2, -ts / 2, ts, ts);
+        ctx.restore();
+      }
     }
     if (p.orbPos) {
       for (const o of p.orbPos) {
@@ -184,6 +196,11 @@ const Skills = {
       }
     }
     for (const w of game.waves.list) {
+      // fx_slash 贴图优先：月牙剑气随方向旋转
+      if (drawSprite(ctx, 'fx_slash', w.x, w.y, {
+        size: w.r * 4.4, angle: w.dir + Math.PI / 4,
+        additive: true, alpha: clamp(w.life / 0.35, 0, 1) * 0.95,
+      })) continue;
       ctx.save();
       ctx.translate(w.x, w.y); ctx.rotate(w.dir);
       ctx.globalAlpha = clamp(w.life / 0.35, 0, 1) * 0.9;

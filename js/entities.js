@@ -432,6 +432,7 @@ class Monster {
     if (this.dead) return;
     this.dead = true;
     game.addKill(this);
+    game.spawnSplat(this.x, this.y, this.boss ? 260 : this.elite ? 180 : 95); // 妖血渍贴花
     FX.soul(this.x, this.y, game.player, this.boss ? 18 : this.elite ? 10 : 4);
     FX.spark(this.x, this.y, '#a8e6ff', 12, 260);
     if (this.elite) { // 斩妖将：掉宝 + 直升小半级

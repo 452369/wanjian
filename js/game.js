@@ -154,6 +154,8 @@ class Game {
     this.monsters = new EntityList(new Pool(() => new Monster()));
     this.bullets = new EntityList(new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, dmg: 0, r: 6 })));
     this.pickups = new EntityList(new Pool(() => ({ x: 0, y: 0, kind: '', t: 0 })));
+    this.novas = new EntityList(new Pool(() => ({ x: 0, y: 0, t: 0, max: 0.32, size: 320, img: null })));
+    this.splats = new EntityList(new Pool(() => ({ x: 0, y: 0, rot: 0, size: 0, t: 0, life: 9 })));
     this.spawner = new Spawner(this);
     this.cam = { x: this.player.x, y: this.player.y };
     this.time = 0;
@@ -260,6 +262,17 @@ class Game {
       p.t = 0;
     });
   }
+  spawnNova(x, y, size, img) {
+    this.novas.spawn(n => { n.x = x; n.y = y; n.size = size; n.t = n.max = 0.32; n.img = img || null; });
+  }
+  spawnSplat(x, y, size) {
+    if (this.splats.list.length > 26) this.splats.list[0].dead = true; // 上限FIFO
+    this.splats.spawn(d => {
+      d.x = x + rand(-6, 6); d.y = y + rand(-6, 6);
+      d.rot = rand(0, TAU); d.size = size * rand(0.8, 1.15);
+      d.t = 0; d.life = 9;
+    });
+  }
 
   nearestMonster(x, y, maxDist = Infinity) {
     let best = null, bd = maxDist * maxDist;
@@ -319,6 +332,7 @@ class Game {
         FX.flash(0.28, t.color);
         Cam.shake(4, 0.3);
         AudioSys.tierUp();
+        this.spawnNova(this.player.x, this.player.y, 220, 'fx_tierup'); // 晋升金色光柱
       }
       need = CFG.levelup.base + (this.player.level - 1) * CFG.levelup.per;
     }
@@ -375,6 +389,7 @@ class Game {
     Cam.shake(10, 0.4);
     Cam.hitStop(0.08);
     AudioSys.boom();
+    this.spawnNova(this.player.x, this.player.y, 380); // 新星爆发贴图
     for (let i = 0; i < 26; i++) {
       this.spawnSword(this.player.x, this.player.y, (i / 26) * TAU);
     }
@@ -453,6 +468,9 @@ class Game {
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
         if (b.life <= 0 || dist2(b.x, b.y, this.player.x, this.player.y) > 950 * 950) b.dead = true;
       }
+      // 光效生命周期
+      for (const n of this.novas.list) { n.t -= dt; if (n.t <= 0) n.dead = true; }
+      for (const d of this.splats.list) { d.t += dt; if (d.t > d.life) d.dead = true; }
       // 道具
       for (const p of this.pickups.list) {
         p.t += dt;
@@ -469,6 +487,7 @@ class Game {
       }
       this.swords.sweep(); this.waves.sweep(); this.bolts.sweep();
       this.monsters.sweep(); this.bullets.sweep(); this.pickups.sweep();
+      this.novas.sweep(); this.splats.sweep();
     }
     // Boss 死亡 → 胜利演出（升级面板冻结世界时也要走到胜利，避免被掉落升级卡住）
     if ((this.state === 'play' || this.state === 'levelup') && this.winTimer > 0) {
@@ -552,6 +571,18 @@ class Game {
     ctx.save();
     ctx.translate(W / 2 - this.cam.x + Cam.ox, H / 2 - this.cam.y + Cam.oy); // 摄像机 + 震屏
     this.ground.draw(ctx, this);
+    // 妖血渍贴花（击杀残留，additive 绿渍）
+    if (Assets.img('fx_splat')) {
+      for (const d of this.splats.list) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.38 * clamp(1 - d.t / d.life, 0, 1);
+        ctx.translate(d.x, d.y); ctx.rotate(d.rot);
+        const img = Assets.img('fx_splat');
+        ctx.drawImage(img, -d.size / 2, -d.size / 2, d.size, d.size);
+        ctx.restore();
+      }
+    }
     for (const p of this.pickups.list) drawPickup(ctx, p);
     for (const m of this.monsters.list) m.draw(ctx, this);
     for (const b of this.bullets.list) {
@@ -563,6 +594,18 @@ class Game {
     if (this.state !== 'over' || this.player.hp > 0) this.player.draw(ctx);
     for (const s of this.swords.list) drawSword(ctx, s);
     Skills.drawWorld(ctx, this);
+    // 新星爆发（万剑归宗/灭字道具）
+    for (const n of this.novas.list) {
+      const img = Assets.img(n.img || 'fx_nova');
+      if (!img) continue;
+      const k = 1 - n.t / n.max;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.95 * (1 - k * 0.5);
+      const sz = n.size * (0.35 + k * 0.95);
+      ctx.drawImage(img, n.x - sz / 2, n.y - sz / 2, sz, sz);
+      ctx.restore();
+    }
     FX.draw(ctx);
     ctx.restore();
     Screens.drawUI(this);
