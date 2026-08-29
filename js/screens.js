@@ -74,69 +74,90 @@ const Screens = {
     ctx.fillText('桌面调试：WASD 移动 · 回车开始 · 123 选技能', W / 2, 780);
   },
 
-  // ---- 战斗 HUD ----
+  // ---- 战斗 HUD（复刻参考视频布局）----
   hud(g) {
     const ctx = g.ctx, W = CFG.view.w, H = CFG.view.h, P = g.player;
-    // 升级进度条（击杀直接涨级）
+    // 左上：暂停圆钮
+    ctx.beginPath(); ctx.arc(30, 40, 16, 0, TAU);
+    ctx.fillStyle = 'rgba(10,10,10,0.75)'; ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('❚❚', 30, 41);
+    ctx.textBaseline = 'alphabetic';
+    // 章节小黑条
+    rr(ctx, 54, 20, 300, 10, 5);
+    ctx.fillStyle = 'rgba(10,10,10,0.75)'; ctx.fill();
+    // 绿色长条：击杀进度（升一级所需击杀）+ 计时内嵌
     const need = CFG.levelup.base + (P.level - 1) * CFG.levelup.per;
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(0, 0, W, 8);
-    ctx.fillStyle = P.tier.color;
-    ctx.fillRect(0, 0, W * clamp(g.killsProg / need, 0, 1), 8);
-    // 等级与剑品
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#cfe8ff';
-    ctx.font = `bold 16px ${Fonts.ui}`;
-    ctx.fillText(`Lv.${P.level} ${P.tier.name}`, 12, 24);
-    // 血条
-    rr(ctx, 12, 34, 150, 12, 6);
+    rr(ctx, 54, 36, 300, 22, 11);
+    ctx.fillStyle = 'rgba(10,10,10,0.75)'; ctx.fill();
+    ctx.save();
+    rr(ctx, 54, 36, 300, 22, 11); ctx.clip();
+    ctx.fillStyle = '#6fbf3f';
+    ctx.fillRect(54, 36, 300 * clamp(g.killsProg / need, 0, 1), 22);
+    ctx.restore();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(fmtTime(g.time), 68, 47);
+    // 等级章
+    rr(ctx, 362, 34, 46, 26, 6);
+    ctx.fillStyle = 'rgba(20,20,20,0.8)'; ctx.fill();
+    ctx.strokeStyle = '#c9a45a'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#ffe9b8'; ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('Lv' + P.level, 385, 47);
+    ctx.textBaseline = 'alphabetic';
+    // 血条（绿条下方）
+    rr(ctx, 54, 64, 220, 10, 5);
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fill();
     if (P.hp > 0) {
-      rr(ctx, 13, 35, 148 * clamp(P.hp / P.stats.maxHp, 0, 1), 10, 5);
+      rr(ctx, 55, 65, 218 * clamp(P.hp / P.stats.maxHp, 0, 1), 8, 4);
       ctx.fillStyle = P.hp / P.stats.maxHp > 0.3 ? '#e85a6b' : '#ff2222'; ctx.fill();
     }
-    ctx.strokeStyle = '#c9a45a'; ctx.lineWidth = 1;
-    rr(ctx, 12, 34, 150, 12, 6); ctx.stroke();
     // buff 图标
-    let bx = 16;
+    let bx = 60;
     const icons = [];
     if (P.buffs.sword2) icons.push({ ch: '剑', c: '#ffd75a', t: P.buffs.sword2 });
     if (P.buffs.rage) icons.push({ ch: '狂', c: '#ff7a4a', t: P.buffs.rage });
     if (P.shield > 0) icons.push({ ch: '盾', c: '#6fd8ff', t: null });
     for (const ic of icons) {
-      ctx.beginPath(); ctx.arc(bx + 11, 62, 11, 0, TAU);
+      ctx.beginPath(); ctx.arc(bx + 11, 92, 11, 0, TAU);
       ctx.fillStyle = 'rgba(8,12,28,0.8)'; ctx.fill();
       ctx.strokeStyle = ic.c; ctx.lineWidth = 1.5; ctx.stroke();
       ctx.fillStyle = ic.c;
       ctx.font = `bold 11px ${Fonts.ui}`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(ic.ch, bx + 11, 63);
-      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(ic.ch, bx + 11, 93);
       if (ic.t !== null) {
-        ctx.fillStyle = '#8fa3d8';
-        ctx.font = `10px ${Fonts.ui}`;
-        ctx.textAlign = 'center';
-        ctx.fillText(Math.ceil(ic.t) + 's', bx + 11, 84);
+        ctx.fillStyle = '#d8e0f0'; ctx.font = '9px sans-serif';
+        ctx.fillText(Math.ceil(ic.t) + 's', bx + 11, 110);
       }
+      ctx.textBaseline = 'alphabetic';
       bx += ic.t !== null ? 30 : 26;
     }
-    // 正计时（顶部中央）
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffe9b8';
-    ctx.font = `bold 22px ${Fonts.ui}`;
-    ctx.fillText(fmtTime(g.time), W / 2, 28);
-    // 金币 / 斩妖（右上，给静音钮让位）
+    // 右上：双资源 + 头像圈
+    ctx.beginPath(); ctx.arc(W - 34, 40, 20, 0, TAU);
+    ctx.fillStyle = 'rgba(20,20,20,0.8)'; ctx.fill();
+    ctx.strokeStyle = '#c9a45a'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#e8ddc0'; ctx.font = `bold 13px ${Fonts.title}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('剑', W - 34, 41);
+    ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'right';
-    ctx.fillStyle = '#ffd75a';
-    ctx.font = `bold 16px ${Fonts.ui}`;
-    ctx.fillText(`金 ${g.gold}`, W - 48, 24);
-    ctx.fillStyle = '#8fa3d8';
-    ctx.font = `14px ${Fonts.ui}`;
-    ctx.fillText(`斩妖 ${g.kills}`, W - 48, 46);
+    ctx.fillStyle = '#7ab8e8';
+    ctx.font = 'bold 15px monospace';
+    ctx.fillText('◆ ' + g.gold, W - 58, 24);
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillText('☠ ' + g.kills, W - 58, 46);
+    // 右侧 X2 加速按钮（装饰）
+    rr(ctx, W - 36, 150, 30, 64, 8);
+    ctx.fillStyle = 'rgba(10,10,10,0.6)'; ctx.fill();
+    ctx.fillStyle = '#ffd75a'; ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('X2', W - 21, 178);
     // Boss 血条
     const boss = g.monsters.list.find(m => m.boss && !m.dead);
     if (boss) {
-      const bw = 380, bxx = (W - bw) / 2, byy = 78;
+      const bw = 380, bxx = (W - bw) / 2, byy = 120;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(bxx, byy, bw, 12);
       ctx.fillStyle = boss.phase === 2 ? '#ff3030' : '#c03050';
@@ -148,63 +169,61 @@ const Screens = {
       ctx.textAlign = 'center';
       ctx.fillText(boss.name + (boss.phase === 2 ? ' · 狂暴' : ''), W / 2, byy - 4);
     }
-    // 连击
+    // 连击（红色系）
     if (g.combo >= 3) {
       const pop = g.comboPop > 0 ? 1 + g.comboPop * 1.6 : 1;
       ctx.textAlign = 'center';
       ctx.globalAlpha = 0.92;
-      ctx.fillStyle = '#ffd75a';
-      ctx.font = `bold ${Math.round((24 + Math.min(g.combo, 30) * 0.5) * pop)}px ${Fonts.ui}`;
-      ctx.fillText(`${g.combo} 连斩`, W / 2, 148);
+      ctx.fillStyle = '#ff5a5a';
+      ctx.font = `bold ${Math.round((22 + Math.min(g.combo, 30) * 0.5) * pop)}px ${Fonts.ui}`;
+      ctx.fillText(`${g.combo} 连斩`, W / 2, 176);
       ctx.globalAlpha = 1;
     }
     this.skillBar(g);
     this.joystick(g);
   },
 
-  // 底部技能栏：主动 6 格 + 被动 7 格
+  // 底部技能栏：圆形主动技能 + 小圆被动（参考视频样式）
   skillBar(g) {
     const ctx = g.ctx, W = CFG.view.w, H = CFG.view.h, P = g.player;
     const actives = CFG.skills.actives.filter(d => P.skills[d.id]);
     const passives = CFG.skills.passives.filter(d => P.skills[d.id]);
-    // 主动格
-    const aw = 54, gap = 8;
-    const totalW = actives.length * aw + (actives.length - 1) * gap;
-    let x = (W - totalW) / 2;
+    // 主动：圆形
+    const R = 26, gap = 14;
+    const totalW = actives.length * R * 2 + (actives.length - 1) * gap;
+    let x = (W - totalW) / 2 + R;
     for (const d of actives) {
-      rr(ctx, x, H - 96, aw, aw, 10);
-      ctx.fillStyle = 'rgba(10,14,30,0.8)'; ctx.fill();
-      ctx.strokeStyle = '#c9a45a'; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.fillStyle = '#ffe9b8';
-      ctx.font = `bold 24px ${Fonts.title}`;
+      ctx.beginPath(); ctx.arc(x, H - 92, R, 0, TAU);
+      ctx.fillStyle = 'rgba(20,40,70,0.85)'; ctx.fill();
+      ctx.strokeStyle = '#5ab8e8'; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.fillStyle = '#cfe8ff';
+      ctx.font = `bold 20px ${Fonts.title}`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(d.icon, x + aw / 2, H - 96 + aw / 2 + 1);
-      // 等级角标
-      ctx.fillStyle = '#0a0e1e';
-      ctx.fillRect(x + aw - 20, H - 96 + aw - 16, 20, 16);
-      ctx.fillStyle = '#54e8c0';
-      ctx.font = `bold 11px ${Fonts.ui}`;
-      ctx.fillText('Lv' + P.skills[d.id], x + aw - 10, H - 96 + aw - 8);
+      ctx.fillText(d.icon, x, H - 92 + 1);
+      // 等级徽章
+      ctx.beginPath(); ctx.arc(x + R - 4, H - 92 + R - 4, 9, 0, TAU);
+      ctx.fillStyle = '#5ab8e8'; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(P.skills[d.id], x + R - 4, H - 92 + R - 3);
       ctx.textBaseline = 'alphabetic';
-      x += aw + gap;
+      x += R * 2 + gap;
     }
-    // 被动格（小）
-    const pw = 36, pgap = 6;
-    const ptw = passives.length * pw + (passives.length - 1) * pgap;
-    let px = (W - ptw) / 2;
+    // 被动：小圆
+    const pr = 17, pgap = 8;
+    const ptw = passives.length * pr * 2 + (passives.length - 1) * pgap;
+    let px = (W - ptw) / 2 + pr;
     for (const d of passives) {
-      rr(ctx, px, H - 148, pw, pw, 8);
-      ctx.fillStyle = 'rgba(10,14,30,0.7)'; ctx.fill();
-      ctx.strokeStyle = 'rgba(201,164,90,0.6)'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.fillStyle = '#b8c4e8';
-      ctx.font = `bold 16px ${Fonts.title}`;
+      ctx.beginPath(); ctx.arc(px, H - 150, pr, 0, TAU);
+      ctx.fillStyle = 'rgba(20,40,70,0.7)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(90,184,232,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = '#9fd0f0';
+      ctx.font = `bold 13px ${Fonts.title}`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(d.icon, px + pw / 2, H - 148 + pw / 2 + 1);
-      ctx.fillStyle = '#54e8c0';
-      ctx.font = `bold 10px ${Fonts.ui}`;
-      ctx.fillText(P.skills[d.id], px + pw - 8, H - 148 + pw - 8);
+      ctx.fillText(d.icon, px, H - 150 + 1);
+      ctx.fillStyle = '#9fd0f0'; ctx.font = 'bold 9px sans-serif';
+      ctx.fillText(P.skills[d.id], px + pr - 5, H - 150 + pr - 5);
       ctx.textBaseline = 'alphabetic';
-      px += pw + pgap;
+      px += pr * 2 + pgap;
     }
   },
 
@@ -302,35 +321,64 @@ const Screens = {
     }
   },
 
+  // 胜利 → 章节结算奖励（复刻参考视频三卡样式）
   win(g) {
     const ctx = g.ctx, W = CFG.view.w;
-    ctx.fillStyle = 'rgba(6,8,20,0.75)';
+    ctx.fillStyle = 'rgba(8,6,12,0.88)';
     ctx.fillRect(0, 0, W, CFG.view.h);
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffd75a';
-    ctx.font = `bold 58px ${Fonts.title}`;
-    ctx.fillText('妖王已诛', W / 2, 272);
-    ctx.fillStyle = '#8fa3d8';
-    ctx.font = `16px ${Fonts.ui}`;
-    ctx.fillText('第一章 · 青云山 通关', W / 2, 308);
-    this.stats(g, 350);
+    // 装饰横线 + 标题
+    ctx.strokeStyle = 'rgba(201,185,138,0.8)'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 170, 155); ctx.lineTo(W / 2 - 100, 155);
+    ctx.moveTo(W / 2 + 100, 155); ctx.lineTo(W / 2 + 170, 155);
+    ctx.stroke();
+    ctx.fillStyle = '#e8ddc0';
+    ctx.font = `bold 36px ${Fonts.title}`;
+    ctx.fillText('结 算 奖 励', W / 2, 168);
+    ctx.fillStyle = '#b8c4e8';
+    ctx.font = `15px ${Fonts.ui}`;
+    ctx.fillText(`存活 ${fmtTime(g.time)} · 斩妖 ${g.kills} · 最高连斩 ${g.maxCombo} · Lv.${g.player.level}`, W / 2, 205);
+    // 三张奖励卡
+    const cards = [
+      { ch: '灵', label: '章节奖励', val: g.lastGold },
+      { ch: '经', label: '修炼心得', val: g.kills * 3 },
+      { ch: '晶', label: '晶石', val: Math.floor(g.kills / 2) },
+    ];
+    cards.forEach((card, i) => {
+      const cx = W / 2 + (i - 1) * 152, cy = 245;
+      rr(ctx, cx - 62, cy, 124, 170, 10);
+      ctx.fillStyle = 'rgba(24,32,60,0.95)'; ctx.fill();
+      ctx.strokeStyle = '#7ab8e8'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#e8f0ff';
+      ctx.font = `bold 46px ${Fonts.title}`;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(card.ch, cx, cy + 58);
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#b8c4e8';
+      ctx.font = `13px ${Fonts.ui}`;
+      ctx.fillText(card.label, cx, cy + 104);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 20px monospace';
+      ctx.fillText(card.val, cx, cy + 136);
+    });
     ctx.fillStyle = '#ffe9b8';
     ctx.font = `bold 18px ${Fonts.ui}`;
-    ctx.fillText(`灵石 +${g.lastGold}${g.doubled ? '（已翻倍）' : ''}`, W / 2, 510);
+    ctx.fillText(`灵石 +${g.lastGold}${g.doubled ? '（已翻倍）' : ''}`, W / 2, 462);
     if (!g.doubled) {
-      this.btn(g, W / 2 - 140, 540, 280, 62, '◈ 灵石翻倍', () => g.adStub('结算翻倍', () => {
+      this.btn(g, W / 2 - 140, 486, 280, 62, '◈ 灵石翻倍', () => g.adStub('结算翻倍', () => {
         g.doubled = true;
         Meta.data.gold += g.lastGold;
         Meta.save();
         g.toast(`灵石 +${g.lastGold}，已翻倍！`);
       }), { fill: 'rgba(90,50,20,0.92)', size: 22 });
-      this.btn(g, W / 2 - 110, 624, 220, 54, '再战一局', () => g.startRun());
-    } else {
       this.btn(g, W / 2 - 110, 570, 220, 54, '再战一局', () => g.startRun());
+    } else {
+      this.btn(g, W / 2 - 110, 560, 220, 54, '再战一局', () => g.startRun());
     }
     ctx.fillStyle = '#3d4a75';
     ctx.font = `14px ${Fonts.ui}`;
-    ctx.fillText('第二章 · 敬请期待', W / 2, 720);
+    ctx.fillText('第二章 · 敬请期待', W / 2, 730);
   },
 
   toast(g) {

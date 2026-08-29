@@ -13,8 +13,8 @@ const CFG = {
     invulnTime: 0.7,   // 受击无敌帧
   },
 
-  // 御剑术（初始主动）基础参数：伤害削弱——怪不再被秒，靠持续输出磨
-  sword: { damage: 9, cooldown: 0.5, speed: 640, life: 1.5, radius: 10 },
+  // 御剑术（初始主动）：青色光束节奏——高须连射、穿透、长距离
+  sword: { damage: 9, cooldown: 0.3, speed: 900, life: 0.75, radius: 10, pierce: 1 },
   crit: { rate: 0.05, mult: 1.8 },
 
   // 升级（击杀直接涨级）刻意放缓：升到下一级所需击杀数 = base + (level-1) * per
@@ -90,6 +90,6 @@ const CFG = {
 
   combo: { window: 2.5 },
 
-  // 地面：程序化石板地砖尺寸 / 装饰件撒点密度（tile_ch1/deco_* 贴图存在则优先用）
-  ground: { tile: 128, decoCell: 340 },
+  // 地面：草地主题（参考视频浅绿草原）+ 深色岩石/水晶装饰；tile 贴图存在则优先
+  ground: { tile: 128, decoCell: 340, theme: 'grass' },
 };
