@@ -87,9 +87,11 @@ class Player {
     dmg = Math.round(dmg * (1 - (this.eff.dmgReduce || 0))); // 铁壁减伤
     this.hp -= dmg;
     this.invuln = CFG.player.invulnTime;
+    FX.hurt(); // 受击红晕
+    FX.hurt(); // 受击红晕
     FX.spark(this.x, this.y, '#ff6b6b', 10, 220);
     FX.num(this.x, this.y - 24, '-' + dmg, true);
-    Cam.shake(7, 0.25);
+    Cam.shake(6, 0.15);
     AudioSys.hurt();
     if (this.hp <= 0) { this.hp = 0; game.onPlayerDead(); }
   }
@@ -299,7 +301,7 @@ class Monster {
           this.slamT -= dt;
           if (this.slamT <= 0) {
             FX.ring(this.x, this.y, '#ff4a6a', 22, 320);
-            Cam.shake(5);
+            Cam.shake(4, 0.2);
             if (dist < 120) p.hurt(14, game);
             AudioSys.boom();
           }
@@ -419,8 +421,11 @@ class Monster {
     this.flash = 0.08;
     const px = hx !== undefined ? hx : this.x;
     const py = hy !== undefined ? hy : this.y;
-    if (!silent) FX.num(px, py - 10, dmg, crit);
-    FX.spark(px, py, crit ? '#ffd75a' : game.player.tier.color, crit ? 10 : 5, crit ? 260 : 170);
+    if (!silent) {
+      FX.num(px, py - 10, dmg, crit);
+      FX.hitImpact(px, py, game.player.tier.color); // 命中冲击反馈
+    }
+    if (crit) FX.spark(px, py, '#ffd75a', 8, 260);
     if (crit) AudioSys.crit();
     if (!silent) AudioSys.hit(game.combo);
     const isBig = this.boss || this.elite;
@@ -434,7 +439,7 @@ class Monster {
     game.addKill(this);
     game.spawnSplat(this.x, this.y, this.boss ? 260 : this.elite ? 180 : 95); // 妖血渍贴花
     FX.soul(this.x, this.y, game.player, this.boss ? 18 : this.elite ? 10 : 4);
-    FX.spark(this.x, this.y, '#a8e6ff', 12, 260);
+    FX.explosion(this.x, this.y, '#a8e6ff', this.boss ? 2.2 : this.elite ? 1.5 : 0.8); // 死亡爆炸
     if (this.elite) { // 斩妖将：掉宝 + 直升小半级
       game.spawnPickup(this.x, this.y);
       game.addKillProgress(4);

@@ -209,7 +209,7 @@ class Game {
     this.spawnPickup(m.x, m.y - 40);
     this.clearBullets();
     FX.flash(0.6);
-    Cam.shake(12, 0.8);
+    Cam.shake(10, 0.5);
     Cam.hitStop(0.12);
     AudioSys.boom();
   }
@@ -298,8 +298,16 @@ class Game {
       b.x = x; b.y = y; b.r = r;
       b.w = rand(10, 14); b.color = color;
       b.t = b.max = 0.28;
+      // 闪电折线（从天而降的锯齿路径）
+      b.pts = [];
+      const sx = x + rand(-46, 46), sy = y - 560;
+      for (let i = 0; i <= 6; i++) {
+        const k = i / 6;
+        b.pts.push([sx + (x - sx) * k + (i < 6 ? rand(-26, 26) : 0), sy + (y - sy) * k]);
+      }
     });
     this.areaDamage(x, y, r, dmg);
+    FX.explosion(x, y, color, 0.7);
     Cam.shake(2, 0.12);
   }
 
@@ -324,7 +332,9 @@ class Game {
       this.player.level++;
       this.pendingLv++;
       AudioSys.levelup();
-      FX.ring(this.player.x, this.player.y, this.player.tier.color, 24, 340); // 升级脉冲
+      Cam.hitStop(0.09); // 升级时停一拍
+      FX.ring(this.player.x, this.player.y, this.player.tier.color, 24, 340);
+      FX.sparkle(this.player.x, this.player.y, '#ffe9b8', 10); // 星尘
       const t = this.player.tier;
       if (t.name !== this.lastTier) {
         this.lastTier = t.name;
@@ -386,7 +396,7 @@ class Game {
 
   nova() { // 万剑归宗爆发：全屏剑雨
     FX.flash(0.45);
-    Cam.shake(10, 0.4);
+    Cam.shake(9, 0.25);
     Cam.hitStop(0.08);
     AudioSys.boom();
     this.spawnNova(this.player.x, this.player.y, 380); // 新星爆发贴图
@@ -414,6 +424,8 @@ class Game {
     if (Cam.hitStopT > 0) { Cam.hitStopT -= dt; gdt = 0; } // 顿帧：世界冻结数帧
     Cam.update(dt);
     this.update(gdt);
+    // 更真实的hit-stop：冻结实体，但特效/镜头继续动
+    FX.update(this.state === 'play' ? dt : Math.min(dt, 0.033));
     FX.updateUI(dt);
     this.draw();
   }
@@ -494,7 +506,6 @@ class Game {
       this.winTimer -= dt;
       if (this.winTimer <= 0) { this.state = 'win'; this.bank(false); }
     }
-    FX.update(this.state === 'play' ? dt : Math.min(dt, 0.033));
   }
 
   // 怪物两两分离，避免叠成一团

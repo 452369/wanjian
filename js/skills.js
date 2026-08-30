@@ -110,7 +110,7 @@ const Skills = {
         const a = rand(0, TAU), d = rand(40, R);
         game.strike(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 55 * e.areaMul, (16 + 8 * lv) * e.dmgMul, p.tier.color);
       }
-      Cam.shake(6, 0.3);
+      Cam.shake(5, 0.2);
       AudioSys.boom();
     }
 
@@ -221,14 +221,30 @@ const Skills = {
     ctx.globalAlpha = 1;
     for (const b of game.bolts.list) {
       const a = clamp(b.t / b.max, 0, 1);
-      ctx.globalAlpha = a * 0.75;
-      ctx.fillStyle = b.color;
-      ctx.fillRect(b.x - b.w / 2, b.y - 560, b.w, 560);
-      ctx.globalAlpha = a * 0.35;
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.4, 0, TAU); ctx.fill();
-      ctx.globalAlpha = a;
-      ctx.strokeStyle = b.color; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1.5 - 0.5 * a), 0, TAU); ctx.stroke();
+      if (b.pts) {
+        // 闪电折线：宽彩辉光 + 白芯
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.globalAlpha = a * 0.55;
+        ctx.strokeStyle = b.color; ctx.lineWidth = 9;
+        ctx.beginPath();
+        b.pts.forEach((p2, i) => i ? ctx.lineTo(p2[0], p2[1]) : ctx.moveTo(p2[0], p2[1]));
+        ctx.stroke();
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.globalAlpha = a * 0.75;
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x - b.w / 2, b.y - 560, b.w, 560);
+        ctx.globalAlpha = a * 0.35;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.4, 0, TAU); ctx.fill();
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = b.color; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1.5 - 0.5 * a), 0, TAU); ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
   },
