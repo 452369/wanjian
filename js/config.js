@@ -53,12 +53,12 @@ const CFG = {
 
   monsters: {
     // 模型与主角同级，Boss/精英巨物压迫感；移速/攻速/伤害下调，数量与血量上调
-    wolf:  { name: '狼妖', hp: 40, speed: 95,  radius: 30, dmg: 6,  xp: 3 },
-    bat:   { name: '蝠妖', hp: 28, speed: 85,  radius: 24, dmg: 5,  xp: 3, sineAmp: 60, sineFreq: 3 },
-    ghost: { name: '符鬼', hp: 60, speed: 65,  radius: 26, dmg: 6,  xp: 5,
+    wolf:  { name: '狼妖', hp: 40, speed: 95,  radius: 34, dmg: 6,  xp: 3 },
+    bat:   { name: '蝠妖', hp: 28, speed: 85,  radius: 28, dmg: 5,  xp: 3, sineAmp: 60, sineFreq: 3 },
+    ghost: { name: '符鬼', hp: 60, speed: 65,  radius: 30, dmg: 6,  xp: 5,
              keepDist: 320, shootGap: 3.2, bulletSpeed: 200, bulletDmg: 6 },
-    elite: { name: '妖将', hp: 700, speed: 70, radius: 52, dmg: 14, xp: 0, gold: 15 },
-    boss:  { name: '黑山老妖', hp: 7000, speed: 55, radius: 84, dmg: 20,
+    elite: { name: '妖将', hp: 700, speed: 70, radius: 60, dmg: 14, xp: 0, gold: 15 },
+    boss:  { name: '黑山老妖', hp: 7000, speed: 55, radius: 96, dmg: 20,
              radialCount: 14, radialGap: 4.0, bulletSpeed: 180,
              dashGap: 5.5, dashSpeed: 420, phase2At: 0.5, xp: 0, gold: 60 },
   },

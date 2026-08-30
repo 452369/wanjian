@@ -473,11 +473,13 @@ class Monster {
     const r = this.r;
     // 行走起伏 + 扑击拉伸 + 蓄力脉冲
     const moving = this.lungeT <= 0 && this.windup <= 0;
-    const hop = moving ? Math.abs(Math.sin(this.t * 10)) * 3 : 0;
+    const hop = moving ? Math.abs(Math.sin(this.t * 10)) * 5 : 0;
     const lk = this.lungeT > 0 ? this.lungeT / 0.22 : 0;
     const wind = this.windup > 0 ? 1 + 0.12 * Math.sin(this.windup * 45) : 1;
+    const wk = moving ? Math.sin(this.t * 10) * 0.06 : 0; // 行走挤压
     if (drawSprite(ctx, 'monster_wolf', this.x, this.y - hop, {
-      size: r * 2.7 * wind, angle: a - Math.PI / 2, sx: 1 + lk * 0.35, sy: 1 - lk * 0.18,
+      size: r * 4.2 * wind, angle: a - Math.PI / 2,
+      sx: (1 + lk * 0.35 + wk) * wind, sy: (1 - lk * 0.18 - wk) * wind,
     })) return;
     ctx.save();
     ctx.translate(this.x, this.y - hop);
@@ -509,7 +511,7 @@ class Monster {
 
   drawBat(ctx, fl) {
     // 扇翅挤压动画
-    if (drawSprite(ctx, 'monster_bat', this.x, this.y, { size: this.r * 2.6, sy: 1 + Math.sin(this.t * 13) * 0.1 })) return;
+    if (drawSprite(ctx, 'monster_bat', this.x, this.y + Math.sin(this.t * 13) * 4, { size: this.r * 4.0, sy: 1 + Math.sin(this.t * 13) * 0.16 })) return;
     const r = this.r;
     const w = Math.sin(this.t * 13) * 0.6;
     ctx.save();
@@ -538,8 +540,8 @@ class Monster {
       ctx.drawImage(glowSprite('#ff4040'), this.x - 24, this.y - 24, 48, 48);
       ctx.globalAlpha = 1;
     }
-    const bob = Math.sin(this.t * 2) * 3;
-    if (drawSprite(ctx, 'monster_ghost', this.x, this.y + bob, { size: this.r * 2.6, angle: Math.sin(this.t * 2.2) * 0.14 })) return;
+    const bob = Math.sin(this.t * 2) * 5;
+    if (drawSprite(ctx, 'monster_ghost', this.x, this.y + bob, { size: this.r * 4.0, angle: Math.sin(this.t * 2.2) * 0.14 })) return;
     ctx.save();
     ctx.translate(this.x, this.y + bob);
     ctx.rotate(Math.sin(this.t * 2.2) * 0.14);
@@ -578,7 +580,8 @@ class Monster {
       ctx.globalAlpha = 1;
     }
     const wind = this.windup > 0 ? 1 + 0.15 * Math.sin(this.windup * 40) : 1;
-    if (drawSprite(ctx, 'monster_elite', this.x, this.y, { size: r * 2.5 * wind, angle: a - Math.PI / 2 })) {
+    const stomp = Math.abs(Math.sin(this.t * 4)) * 4;
+    if (drawSprite(ctx, 'monster_elite', this.x, this.y - stomp, { size: r * 3.4 * wind, angle: a - Math.PI / 2 })) {
       this.drawHpBar(ctx, r);
       return;
     }
@@ -622,7 +625,9 @@ class Monster {
 
   drawBoss(ctx, fl) {
     const r = this.r;
-    if (drawSprite(ctx, this.phase === 2 ? 'boss_heishan_rage' : 'boss_heishan', this.x, this.y, { size: r * 2.5 })) return;
+    if (drawSprite(ctx, this.phase === 2 ? 'boss_heishan_rage' : 'boss_heishan', this.x, this.y, {
+      size: r * 3.2 * (1 + Math.sin(this.t * 1.8) * 0.03),
+    })) return;
     ctx.globalAlpha = 0.5 + Math.sin(this.t * 3) * 0.15;
     ctx.drawImage(glowSprite('#ff3a3a'), this.x - r * 2, this.y - r * 2, r * 4, r * 4);
     ctx.globalAlpha = 1;

@@ -34,9 +34,9 @@ const FX = {
     if (now - this._lastImpact < 40) return;
     this._lastImpact = now;
     if (!this.canSpawn()) return;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 9; i++) {
       if (!this.canSpawn()) return;
-      const a = rand(0, TAU), s = rand(220, 420);
+      const a = rand(0, TAU), s = rand(260, 480);
       this.parts.spawn(p => {
         p.kind = 2; p.x = x; p.y = y;
         p.vx = Math.cos(a) * s; p.vy = Math.sin(a) * s;
@@ -44,7 +44,7 @@ const FX = {
         p.drag = 6; p.grav = 0;
       });
     }
-    this.ring(x, y, color, 8, 140);
+    this.ring(x, y, color, 10, 180);
   },
   // 灵魂粒子：飞向玩家（收集感）
   soul(x, y, target, n = 4) {
